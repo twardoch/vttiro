@@ -47,6 +47,9 @@ class GeminiTranscriber(TranscriptionEngine):
             
         genai.configure(api_key=api_key)
         
+        # Get configurable safety settings
+        safety_settings = self._get_safety_settings(config)
+        
         # Initialize model with optimal settings for transcription
         self.model = genai.GenerativeModel(
             model_name=model.value,  # Use specified model variant
@@ -56,12 +59,7 @@ class GeminiTranscriber(TranscriptionEngine):
                 "top_k": 40,
                 "max_output_tokens": 8192,
             },
-            safety_settings={
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-            }
+            safety_settings=safety_settings
         )
         
         # Model capabilities
@@ -78,6 +76,59 @@ class GeminiTranscriber(TranscriptionEngine):
             include_emotions=True,
             template=PromptTemplate.SPEAKER_DIARIZATION
         )
+    
+    def _get_safety_settings(self, config: VttiroConfig) -> Dict[HarmCategory, HarmBlockThreshold]:
+        """Get configurable safety settings for Gemini transcription.
+        
+        For transcription use cases, we default to minimal blocking since:
+        1. Audio content is typically legitimate speech/interviews
+        2. False positives can block valid transcription tasks
+        3. Users can override via environment variables if needed
+        
+        Environment variables to override defaults:
+        - GEMINI_SAFETY_HARASSMENT: none|low|medium|high (default: none)
+        - GEMINI_SAFETY_HATE_SPEECH: none|low|medium|high (default: none)  
+        - GEMINI_SAFETY_SEXUALLY_EXPLICIT: none|low|medium|high (default: none)
+        - GEMINI_SAFETY_DANGEROUS_CONTENT: none|low|medium|high (default: none)
+        """
+        import os
+        
+        # Mapping from string values to HarmBlockThreshold enums
+        threshold_map = {
+            "none": HarmBlockThreshold.BLOCK_NONE,
+            "low": HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            "medium": HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            "high": HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+        }
+        
+        # Default to minimal blocking for transcription use case
+        defaults = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: "none",
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: "none", 
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: "none",
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: "none",
+        }
+        
+        # Check for environment variable overrides
+        env_overrides = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: os.getenv("GEMINI_SAFETY_HARASSMENT", defaults[HarmCategory.HARM_CATEGORY_HARASSMENT]),
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: os.getenv("GEMINI_SAFETY_HATE_SPEECH", defaults[HarmCategory.HARM_CATEGORY_HATE_SPEECH]),
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: os.getenv("GEMINI_SAFETY_SEXUALLY_EXPLICIT", defaults[HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT]),
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: os.getenv("GEMINI_SAFETY_DANGEROUS_CONTENT", defaults[HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT]),
+        }
+        
+        # Build final safety settings
+        safety_settings = {}
+        for category, threshold_str in env_overrides.items():
+            threshold_str = threshold_str.lower()
+            if threshold_str in threshold_map:
+                safety_settings[category] = threshold_map[threshold_str]
+                logger.debug(f"Safety setting for {category}: {threshold_str}")
+            else:
+                logger.warning(f"Invalid safety threshold '{threshold_str}' for {category}, using default 'none'")
+                safety_settings[category] = HarmBlockThreshold.BLOCK_NONE
+        
+        return safety_settings
         
     @property
     def name(self) -> str:
@@ -108,8 +159,50 @@ class GeminiTranscriber(TranscriptionEngine):
             # Perform transcription
             response = await self._transcribe_with_gemini(audio_file, prompt)
             
-            # Process WebVTT response
-            webvtt_content = response.text.strip()
+            # Check for safety filter blocking before accessing response.text
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                finish_reason = getattr(candidate, 'finish_reason', None)
+                
+                if finish_reason == 2:  # SAFETY filter blocking
+                    # Get safety ratings for detailed error
+                    safety_ratings = getattr(response, 'safety_ratings', [])
+                    blocked_categories = []
+                    for rating in safety_ratings:
+                        if hasattr(rating, 'blocked') and rating.blocked:
+                            category_name = getattr(rating, 'category', 'unknown')
+                            blocked_categories.append(str(category_name))
+                    
+                    # Create detailed error message
+                    if blocked_categories:
+                        categories_str = ', '.join(blocked_categories)
+                        error_msg = (f"Gemini safety filter blocked transcription due to: {categories_str}. "
+                                   f"This audio content was flagged as potentially harmful. "
+                                   f"Try using a different AI engine like --engine openai or --engine assemblyai, "
+                                   f"or check if the audio contains potentially sensitive content.")
+                    else:
+                        error_msg = (f"Gemini safety filter blocked transcription (finish_reason: {finish_reason}). "
+                                   f"This audio content was flagged as potentially harmful. "
+                                   f"Try using a different AI engine like --engine openai or --engine assemblyai.")
+                    
+                    logger.error(f"Safety filter blocking detected: {error_msg}")
+                    raise ValueError(error_msg)
+                    
+                elif finish_reason != 1 and finish_reason is not None:  # 1 = STOP (normal completion)
+                    # Handle other non-normal finish reasons
+                    error_msg = (f"Gemini transcription failed with finish_reason: {finish_reason}. "
+                               f"Try using a different model like --model gemini-2.0-flash or a different engine.")
+                    logger.error(f"Unusual finish reason: {error_msg}")
+                    raise ValueError(error_msg)
+            
+            # Process WebVTT response (only if we passed safety checks)
+            try:
+                webvtt_content = response.text.strip()
+            except Exception as e:
+                # Fallback error handling if response.text still fails
+                logger.error(f"Failed to access response text: {e}")
+                raise ValueError(f"Gemini transcription failed: {e}. Try using a different engine or model.")
+            
             processing_time = time.time() - start_time
             
             # Log raw response for debugging (truncated if too long)
@@ -154,6 +247,25 @@ class GeminiTranscriber(TranscriptionEngine):
                     "format": "webvtt",
                     "webvtt_content": webvtt_content,  # Store original WebVTT
                     "native_timing": True  # Flag indicating real timestamps
+                },
+                raw_response={
+                    "type": "google.generativeai.GenerateContentResponse",
+                    "text": webvtt_content,
+                    "candidates": [
+                        {
+                            "content": getattr(candidate, 'content', None) if hasattr(response, 'candidates') and response.candidates else None,
+                            "finish_reason": getattr(candidate, 'finish_reason', None) if hasattr(response, 'candidates') and response.candidates else None,
+                        } for candidate in (response.candidates if hasattr(response, 'candidates') and response.candidates else [])
+                    ],
+                    "safety_ratings": [
+                        {
+                            "category": str(getattr(rating, 'category', 'unknown')),
+                            "probability": str(getattr(rating, 'probability', 'unknown')),
+                            "blocked": getattr(rating, 'blocked', False)
+                        } for rating in getattr(response, 'safety_ratings', [])
+                    ],
+                    "prompt_feedback": getattr(response, 'prompt_feedback', None),
+                    "usage_metadata": getattr(response, 'usage_metadata', None)
                 }
             )
             

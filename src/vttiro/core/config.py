@@ -207,3 +207,4 @@ class TranscriptionResult:
     speaker_segments: Optional[List[Dict[str, Any]]] = None
     emotions: Optional[List[Dict[str, Any]]] = None
     metadata: Optional[Dict[str, Any]] = None
+    raw_response: Optional[Any] = None  # Complete raw AI model output for --raw mode

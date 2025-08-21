@@ -9,6 +9,7 @@ audio/video files to WebVTT subtitles using AI models.
 import asyncio
 import uuid
 import time
+import json
 from pathlib import Path
 from typing import Optional, Union, List, Dict, Any
 
@@ -171,11 +172,24 @@ class FileTranscriber:
             model_enum = DeepgramModel(model)
             return DeepgramTranscriber(self.config, model_enum)
         elif engine == "openai":
-            from vttiro.models.openai import OpenAITranscriber
-            from vttiro.models.base import OpenAIModel
-
-            model_enum = OpenAIModel(model)
-            return OpenAITranscriber(self.config, model_enum)
+            logger.debug(f"Creating OpenAI transcriber for engine={engine}, model={model}")
+            try:
+                from vttiro.models.openai import OpenAITranscriber
+                from vttiro.models.base import OpenAIModel
+                logger.debug("OpenAI imports successful")
+                
+                logger.debug(f"Converting model string '{model}' to OpenAIModel enum")
+                model_enum = OpenAIModel(model)
+                logger.debug(f"Model enum created: {model_enum}")
+                
+                logger.debug("Creating OpenAITranscriber instance")
+                transcriber = OpenAITranscriber(self.config, model_enum)
+                logger.info(f"OpenAI transcriber created successfully: {transcriber.name}")
+                return transcriber
+            except Exception as e:
+                error_msg = f"Failed to create OpenAI transcriber: {e}"
+                logger.error(error_msg)
+                raise
         else:
             raise ValidationError(f"Unsupported engine: {engine}")
 
@@ -293,6 +307,7 @@ class FileTranscriber:
         xtra_prompt: Optional[str] = None,
         add_cues: bool = False,
         keep_audio: bool = False,
+        raw: bool = False,
     ) -> Path:
         """Transcribe audio/video file to WebVTT subtitles.
 
@@ -305,6 +320,7 @@ class FileTranscriber:
             xtra_prompt: Append to default/custom prompt (file path or text, optional)
             add_cues: Include cue identifiers in WebVTT output (default: False)
             keep_audio: Save audio file next to video with same basename, reuse existing (default: False)
+            raw: Save complete raw AI model output as JSON alongside WebVTT file (default: False)
 
         Returns:
             Path to generated WebVTT file
@@ -424,12 +440,16 @@ class FileTranscriber:
             try:
                 self._save_webvtt(result, output_path)
                 
+                # Save raw output if requested
+                if raw:
+                    self._save_raw_output(result, output_path)
+                
                 # Record output file size
                 output_size = output_path.stat().st_size if output_path.exists() else 0
                 
                 self.performance_monitor.finish_operation(
                     webvtt_generation_op, success=True,
-                    metadata={"output_file_size": output_size}
+                    metadata={"output_file_size": output_size, "raw_output_saved": raw}
                 )
             except Exception as e:
                 self.performance_monitor.finish_operation(
@@ -513,6 +533,68 @@ class FileTranscriber:
 
         except Exception as e:
             raise ProcessingError(f"Failed to save WebVTT file: {e}")
+
+    def _save_raw_output(self, result: TranscriptionResult, webvtt_path: Path) -> None:
+        """Save complete raw AI model output as JSON alongside WebVTT file.
+
+        Args:
+            result: Transcription result object containing raw output
+            webvtt_path: Path to WebVTT file (used to determine JSON output path)
+
+        Raises:
+            ProcessingError: If file writing fails
+        """
+        try:
+            # Create JSON file path with .vtt.json extension
+            json_path = webvtt_path.with_suffix(".vtt.json")
+            
+            # Ensure output directory exists
+            json_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Create comprehensive raw output data
+            raw_data = {
+                "metadata": {
+                    "transcription_timestamp": time.time(),
+                    "engine": getattr(result, "engine", "unknown"),
+                    "model": getattr(result, "model", "unknown"),
+                    "language": result.language,
+                    "confidence": result.confidence,
+                    "processing_time": getattr(result, "processing_time", None),
+                    "file_duration": getattr(result, "file_duration", None),
+                    "vttiro_version": "1.0.1"  # Add version info
+                },
+                "transcription": {
+                    "text": result.text,
+                    "word_timestamps": result.word_timestamps,
+                    "start_time": getattr(result, "start_time", None),
+                    "end_time": getattr(result, "end_time", None),
+                },
+                "raw_response": getattr(result, "raw_response", None),
+                "additional_metadata": result.metadata or {}
+            }
+
+            # Write JSON file with proper formatting
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(raw_data, f, indent=2, ensure_ascii=False, default=self._json_serializer)
+
+            logger.debug(f"Raw output JSON saved: {json_path}")
+
+        except Exception as e:
+            raise ProcessingError(f"Failed to save raw output JSON: {e}")
+
+    def _json_serializer(self, obj):
+        """Custom JSON serializer for handling non-JSON-serializable objects."""
+        # Handle common AI model response types
+        if hasattr(obj, '__dict__'):
+            return str(obj)
+        elif hasattr(obj, '_asdict'):  # namedtuple
+            return obj._asdict()
+        elif hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        elif hasattr(obj, '__str__'):
+            return str(obj)
+        else:
+            return f"<{type(obj).__name__} object>"
 
     def _create_webvtt_segments(
         self, result: TranscriptionResult

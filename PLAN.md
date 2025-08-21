@@ -1,35 +1,161 @@
 ---
-this_file: PLAN.md
+# this_file: PLAN.md
 ---
 
-# vttiro Issue 105 - WebVTT Timing and Format Fixes
+# vttiro Transcription Engine Fix Plan (Issue 204)
+
+## Problem Analysis
+
+Based on the test output in `issues/204.txt`, we identified two critical issues affecting transcription reliability:
+
+### Issue 1: Gemini-2.5-pro Safety Filter Blocking (finish_reason: 2)
+- **Root Cause**: Gemini's safety filters are blocking transcription responses due to overly restrictive safety settings
+- **Error**: `Invalid operation: The response.text quick accessor requires the response to contain a valid Part, but none were returned. The candidate's finish_reason is 2`
+- **Impact**: Complete failure of gemini-2.5-pro model for legitimate audio content
+
+### Issue 2: OpenAI Models Silent Failure  
+- **Root Cause**: OpenAI transcriber initialization or execution failing silently without error logging
+- **Symptoms**: No output, no error messages, no logging - complete silent failure
+- **Models Affected**: whisper-1, gpt-4o-transcribe, gpt-4o-mini-transcribe
+- **Impact**: 100% failure rate for all OpenAI models
 
 ## Project Overview
 
-This plan addresses critical issues identified in the WebVTT generation process, particularly the timing problems with Gemini transcription that result in invalid timestamp ranges and non-sequential timelines.
+This plan addresses these critical transcription engine failures to restore reliability across all supported AI models.
 
-## Root Cause Analysis
+## Technical Solution Plan
 
-The main issue is that we're asking Gemini for plain text transcription and then attempting to artificially generate timestamps based on estimated word timing. This approach fails because:
+### Phase 1: Fix Gemini Safety Filter Issue
 
-1. **No real timing information**: Gemini returns plain text without actual audio timing
-2. **Artificial segmentation**: Our current code splits text arbitrarily and assigns estimated timestamps
-3. **Timestamp calculation errors**: The estimation logic produces invalid ranges where end times precede start times
-4. **Missing audio timing context**: We lose the relationship between audio segments and transcribed text
+#### 1.1 Implement Configurable Safety Settings
+- **Location**: `src/vttiro/models/gemini.py`
+- **Changes**:
+  - Add safety settings configuration to `GeminiTranscriber.__init__()`
+  - Create `_get_safety_settings()` method with reasonable defaults
+  - Allow override via config or environment variables
+  - Set default safety thresholds to `BLOCK_ONLY_HIGH` or `BLOCK_NONE` for transcription use case
 
-## Technical Architecture Decisions
+#### 1.2 Add Safety Filter Error Handling  
+- **Location**: `src/vttiro/models/gemini.py` in `transcribe()` method
+- **Changes**:
+  - Detect `finish_reason: 2` specifically
+  - Provide user-friendly error message explaining safety filter blocking
+  - Suggest retry with different settings or alternative models
+  - Log the specific safety category that triggered the block
 
-### Core Strategy Change
-Switch from requesting plain text to requesting WebVTT format directly from AI engines, leveraging their native timestamp generation capabilities.
+#### 1.3 Configuration Integration
+- **Location**: `src/vttiro/core/config.py`
+- **Changes**:
+  - Add `gemini_safety_settings` configuration option
+  - Allow per-category safety threshold configuration
+  - Document safety implications in configuration
 
-### Key Design Principles
-1. **Native format support**: Use engines' built-in WebVTT/SRT output when available
-2. **Fallback compatibility**: Maintain current approach as fallback for engines without native timing
-3. **Modular prompting**: Create reusable prompt templates with proper WebVTT examples
-4. **Audio format optimization**: Use MP3 instead of WAV for better performance
-5. **Optional identifiers**: Make WebVTT cue identifiers optional based on user preference
+### Phase 2: Fix OpenAI Silent Failure Issue
 
-## Phase-by-Phase Implementation Plan
+#### 2.1 Enhanced Error Handling and Logging
+- **Location**: `src/vttiro/models/openai.py`
+- **Changes**:
+  - Add comprehensive try-catch blocks around all initialization steps
+  - Add debug logging for API key validation, client initialization
+  - Add specific error handling for missing dependencies, API failures
+  - Ensure all exceptions are properly logged and re-raised
+
+#### 2.2 Graceful Dependency Management
+- **Location**: `src/vttiro/models/openai.py`
+- **Changes**:
+  - Improve OpenAI package import error handling
+  - Add validation for API key format and availability
+  - Test API connectivity during initialization
+  - Provide clear error messages for configuration issues
+
+#### 2.3 CLI Integration Debugging
+- **Location**: `src/vttiro/core/file_transcriber.py`
+- **Changes**:
+  - Add debug logging in `_create_transcriber()` for OpenAI path
+  - Ensure transcriber creation errors are properly propagated
+  - Add model validation before transcriber instantiation
+
+### Phase 3: Robustness Improvements
+
+#### 3.1 Universal Error Handling Framework
+- **Location**: `src/vttiro/core/file_transcriber.py`
+- **Changes**:
+  - Implement standardized error handling pattern across all engines
+  - Add correlation IDs to track errors across operations
+  - Implement graceful degradation when models fail
+  - Add retry logic with exponential backoff for transient failures
+
+#### 3.2 Model Fallback System
+- **Location**: `src/vttiro/core/file_transcriber.py`
+- **Changes**:
+  - Implement automatic fallback to alternative models when primary fails
+  - Create model compatibility matrix for intelligent fallbacks
+  - Add user notification when fallback occurs
+  - Preserve user's engine preference while allowing model switching
+
+#### 3.3 Configuration Validation
+- **Location**: `src/vttiro/core/config.py`
+- **Changes**:
+  - Add startup validation for all configured engines
+  - Test API connectivity and credentials during config load
+  - Provide clear feedback on configuration issues
+  - Add config doctor command for troubleshooting
+
+### Phase 4: Testing and Validation
+
+#### 4.1 Comprehensive Test Suite
+- **Location**: `tests/integration/`
+- **Changes**:
+  - Create integration tests for all engine/model combinations
+  - Add specific tests for safety filter scenarios
+  - Add tests for API failure conditions
+  - Implement test fixtures for various audio content types
+
+#### 4.2 Error Scenario Testing
+- **Location**: `tests/unit/`
+- **Changes**:
+  - Test safety filter error handling paths
+  - Test OpenAI initialization failure scenarios
+  - Test network failure and retry logic
+  - Test configuration validation edge cases
+
+#### 4.3 End-to-End Validation
+- **Location**: `tests/e2e/`
+- **Changes**:
+  - Create automated test script similar to `temp/test1.sh`
+  - Test all models with known-good audio samples
+  - Validate error reporting and user experience
+  - Performance regression testing
+
+## Implementation Priority
+
+1. **High Priority**: Fix OpenAI silent failure (blocking all OpenAI usage)
+2. **High Priority**: Fix Gemini safety filter issue (blocking gemini-2.5-pro)
+3. **Medium Priority**: Enhanced error handling framework
+4. **Medium Priority**: Model fallback system
+5. **Low Priority**: Comprehensive testing suite
+
+## Success Criteria
+
+- All OpenAI models produce transcription output or clear error messages
+- Gemini-2.5-pro successfully transcribes legitimate audio content
+- No silent failures - all errors provide actionable feedback
+- Fallback system prevents total transcription failure
+- Test suite achieves >95% pass rate across all engine/model combinations
+
+## Risk Mitigation
+
+- **Safety Settings**: Document security implications of relaxed safety filters
+- **API Costs**: Implement cost estimation and limits for retry logic
+- **Breaking Changes**: Maintain backward compatibility for existing configurations
+- **Performance**: Ensure error handling doesn't impact transcription speed
+
+## Future Enhancements
+
+- Adaptive safety settings based on content type
+- Machine learning-based model selection
+- Real-time health monitoring for all engines
+- User feedback integration for model quality assessment
 
 ### Phase 1: Core Prompt Infrastructure
 **Priority: HIGH | Duration: 1-2 days**

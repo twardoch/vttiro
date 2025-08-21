@@ -214,6 +214,7 @@ class VttiroCLI:
         add_cues: bool = False,
         verbose: bool = False,
         keep_audio: bool = False,
+        raw: bool = False,
     ) -> str:
         """Transcribe audio/video file to WebVTT subtitles.
 
@@ -227,6 +228,7 @@ class VttiroCLI:
             add_cues: Include cue identifiers in WebVTT output (default: False)
             verbose: Enable detailed debug logging for troubleshooting (default: False)
             keep_audio: Save audio file next to video with same basename, reuse existing (default: False)
+            raw: Save complete raw AI model output as JSON alongside WebVTT file (default: False)
 
         Returns:
             Path to generated WebVTT file
@@ -241,6 +243,7 @@ class VttiroCLI:
             vttiro transcribe video.mp4 --xtra_prompt "Focus on technical terms"
             vttiro transcribe video.mp4 --add_cues
             vttiro transcribe video.mp4 --keep_audio
+            vttiro transcribe video.mp4 --raw
         """
         try:
             # Setup verbose logging if requested
@@ -355,8 +358,8 @@ class VttiroCLI:
                     return ""
 
             # Show prompt customization info if used
-            if processed_full_prompt or processed_xtra_prompt or add_cues:
-                self.console.print("[blue]Prompt Customization:[/blue]")
+            if processed_full_prompt or processed_xtra_prompt or add_cues or raw:
+                self.console.print("[blue]Options:[/blue]")
                 if processed_full_prompt:
                     prompt_preview = get_prompt_preview(processed_full_prompt, 60)
                     self.console.print(f"  [dim]Custom prompt:[/dim] {prompt_preview}")
@@ -365,6 +368,8 @@ class VttiroCLI:
                     self.console.print(f"  [dim]Extra prompt:[/dim] {extra_preview}")
                 if add_cues:
                     self.console.print(f"  [dim]Include cue IDs:[/dim] Yes")
+                if raw:
+                    self.console.print(f"  [dim]Save raw output:[/dim] Yes")
 
             # Analyze file and provide recommendations
             self._analyze_file_and_recommend_model(input_path, engine, model)
@@ -385,6 +390,7 @@ class VttiroCLI:
                 "xtra_prompt": processed_xtra_prompt,
                 "add_cues": add_cues,
                 "keep_audio": keep_audio,
+                "raw": raw,
             }
 
             with self.console.status(
@@ -685,6 +691,10 @@ class VttiroCLI:
                 from deepgram import DeepgramClient
 
                 return True
+            elif engine == "openai":
+                import openai
+                
+                return True
             else:
                 return False
         except ImportError:
@@ -696,6 +706,7 @@ class VttiroCLI:
                 "gemini": "uv add google-generativeai",
                 "assemblyai": "uv add assemblyai",
                 "deepgram": "uv add deepgram-sdk",
+                "openai": "uv add openai",
             }
 
             cmd = install_commands.get(engine, f"uv add {engine}-sdk")
@@ -717,6 +728,7 @@ class VttiroCLI:
   --full_prompt TEXT        Replace default prompt entirely (file path or direct text)
   --xtra_prompt TEXT       Append to default/custom prompt (file path or direct text)  
   --add_cues               Include cue identifiers in WebVTT output (default: False)
+  --raw                    Save complete raw AI model output as JSON alongside WebVTT file (default: False)
 
 [bold]Commands:[/bold]
   transcribe          Transcribe audio/video file to WebVTT subtitles
@@ -752,6 +764,7 @@ class VttiroCLI:
   vttiro transcribe video.mp4 --add_cues          # Include cue identifiers
   vttiro transcribe video.mp4 --xtra_prompt "Focus on technical terms"
   vttiro transcribe video.mp4 --full_prompt "Custom instructions"
+  vttiro transcribe video.mp4 --raw               # Save raw AI output as JSON
   vttiro performance_report --sessions 20         # Show performance for last 20 sessions
   vttiro performance_report --detailed            # Show detailed session breakdown
   vttiro performance_stats                        # Quick performance summary

@@ -32,37 +32,95 @@ class OpenAITranscriber(TranscriptionEngine):
     """OpenAI Audio API transcription engine with Whisper-1 and GPT-4o support."""
     
     def __init__(self, config: VttiroConfig, model: OpenAIModel = OpenAIModel.GPT_4O_TRANSCRIBE):
-        super().__init__(config)
-        self.model_variant = model
-        
-        if not OPENAI_AVAILABLE:
-            raise ImportError("OpenAI not available. Install with: uv add openai")
-        
-        # Configure OpenAI API
-        api_key = config.transcription.openai_api_key
-        if not api_key:
-            raise ValueError("OpenAI API key not configured. Set OPENAI_API_KEY environment variable.")
+        try:
+            logger.debug(f"Starting OpenAI transcriber initialization with model: {model.value}")
+            super().__init__(config)
+            self.model_variant = model
             
-        self.client = OpenAI(api_key=api_key)
-        
-        # Model-specific configuration
-        self.model_config = self._get_model_config(model)
-        
-        # Language support mapping
-        self._supported_languages = self._get_supported_languages(model)
-        
-        # Initialize WebVTT prompt generator for GPT-4o models
-        if model in [OpenAIModel.GPT_4O_TRANSCRIBE, OpenAIModel.GPT_4O_MINI_TRANSCRIBE]:
-            self.prompt_generator = WebVTTPromptGenerator(
-                include_examples=True,
-                include_diarization=True,
-                include_emotions=True,
-                template=PromptTemplate.SPEAKER_DIARIZATION
-            )
-        else:
-            self.prompt_generator = None
-        
-        logger.debug(f"OpenAI transcriber initialized: {model.value}")
+            # Check OpenAI availability with detailed logging
+            logger.debug(f"Checking OpenAI package availability: {OPENAI_AVAILABLE}")
+            if not OPENAI_AVAILABLE:
+                error_msg = "OpenAI not available. Install with: uv add openai"
+                logger.error(error_msg)
+                raise ImportError(error_msg)
+            
+            # Configure OpenAI API with enhanced validation
+            logger.debug("Retrieving OpenAI API key from configuration")
+            api_key = config.transcription.openai_api_key
+            if not api_key:
+                error_msg = "OpenAI API key not configured. Set OPENAI_API_KEY environment variable."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            # Validate API key format (basic validation)
+            if not api_key.startswith('sk-'):
+                logger.warning(f"API key format may be invalid (doesn't start with 'sk-'): {api_key[:10]}...")
+            
+            logger.debug(f"Creating OpenAI client with API key: {api_key[:10]}...")
+            try:
+                self.client = OpenAI(api_key=api_key)
+                logger.debug("OpenAI client created successfully")
+            except Exception as e:
+                error_msg = f"Failed to create OpenAI client: {e}"
+                logger.error(error_msg)
+                raise ValueError(error_msg) from e
+            
+            # Test API connectivity with a simple call
+            logger.debug("Testing OpenAI API connectivity")
+            try:
+                # Simple test to validate API key and connectivity
+                models = self.client.models.list()
+                logger.debug(f"API connectivity test successful, found {len(models.data)} models")
+            except Exception as e:
+                error_msg = f"OpenAI API connectivity test failed: {e}"
+                logger.error(error_msg)
+                raise ConnectionError(error_msg) from e
+            
+            # Model-specific configuration
+            logger.debug(f"Getting model configuration for: {model.value}")
+            try:
+                self.model_config = self._get_model_config(model)
+                logger.debug(f"Model configuration loaded: {self.model_config}")
+            except Exception as e:
+                error_msg = f"Failed to get model configuration: {e}"
+                logger.error(error_msg)
+                raise ValueError(error_msg) from e
+            
+            # Language support mapping
+            logger.debug("Loading supported languages")
+            try:
+                self._supported_languages = self._get_supported_languages(model)
+                logger.debug(f"Supported languages: {self._supported_languages}")
+            except Exception as e:
+                logger.warning(f"Failed to load supported languages, using fallback: {e}")
+                self._supported_languages = {"en", "es", "fr", "de", "it", "pt"}
+            
+            # Initialize WebVTT prompt generator for GPT-4o models
+            if model in [OpenAIModel.GPT_4O_TRANSCRIBE, OpenAIModel.GPT_4O_MINI_TRANSCRIBE]:
+                logger.debug("Initializing WebVTT prompt generator for GPT-4o model")
+                try:
+                    self.prompt_generator = WebVTTPromptGenerator(
+                        include_examples=True,
+                        include_diarization=True,
+                        include_emotions=True,
+                        template=PromptTemplate.SPEAKER_DIARIZATION
+                    )
+                    logger.debug("WebVTT prompt generator initialized successfully")
+                except Exception as e:
+                    error_msg = f"Failed to initialize prompt generator: {e}"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg) from e
+            else:
+                logger.debug("Using Whisper-1 model, no prompt generator needed")
+                self.prompt_generator = None
+            
+            logger.info(f"OpenAI transcriber initialized successfully: {model.value}")
+            
+        except Exception as e:
+            error_msg = f"OpenAI transcriber initialization failed: {e}"
+            logger.error(error_msg)
+            # Re-raise with more context
+            raise type(e)(error_msg) from e
     
     @property
     def name(self) -> str:
@@ -267,7 +325,18 @@ class OpenAITranscriber(TranscriptionEngine):
             processing_time=processing_time,
             model_name=self.model_variant.value,
             language=params.get("language", "auto"),
-            metadata=metadata
+            metadata=metadata,
+            raw_response={
+                "type": "openai.Transcription",
+                "text": getattr(response, 'text', transcribed_text),
+                "language": getattr(response, 'language', None),
+                "duration": getattr(response, 'duration', None),
+                "words": getattr(response, 'words', []),
+                "segments": getattr(response, 'segments', []),
+                "response_format": response_format,
+                "model": self.model_variant.value,
+                "original_response": str(response) if hasattr(response, '__dict__') else str(response)
+            }
         )
     
     def _parse_webvtt_response(self, webvtt_content: str) -> tuple[str, List[Dict[str, Any]]]:

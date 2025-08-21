@@ -114,17 +114,27 @@ class WebVTTPromptGenerator:
     def _get_base_prompt(self) -> str:
         """Get base prompt based on selected template."""
         prompt_intro = """
-You are a transcription expert. You are given an audio file and you are to transcribe it into a WebVTT subtitle file with precise timestamps. You must understand the domain of the audio, and you must appropriately and contextually recognize proper names and professional terminology. 
+You are a transcription expert. You are given an audio file and you are to create a “clean verbatim” (“intelligent verbatim”) transcript into a WebVTT subtitle file with precise timestamps. You must understand the domain of the audio, and you must appropriately and contextually recognize proper names and domain-specific terminology. 
 
 Whenever personal names, brand names and other proper names are mentioned, you must transcribe them so accordingly to the standards of the domain, and you must transcribe them consistently throughout the entire transcript.
 
-Use Unicode characters for non-English names and words. Especially, use Latin-extended Unicode characters for names like Lech Wałęsa, even if the speakers says them in an americanized fashion. 
+Use Unicode characters for non-English names and words. Especially, use Latin-extended Unicode characters for names like `Lech Wałęsa`, even if the speakers says them in an americanized fashion. 
 
-Do not transcribe involuntary utterances and repetitions like uhm, err, ahhh. Perform a minimal cleanup so that the text is written in a clean, orthographically correct manner with proper punctuation. Use professional typographic quote marks and punctuation appropriate for the language. 
+Omit from the transcript: 
+
+- Hesitation markers and filler words like `uh`, `um`, `er`, `ah` etc.), 
+- Discourse markers at the beginning and in the middle of sentences (`Well`, `So`, `Now`, `I mean`, `Basically`, `kind of`, `you know`, `you see`, `you know what I mean`, etc.), 
+- False starts, self-corrections, stutters, and repetitions.
+
+Perform intelligent minimal cleanup as you emit the transcript, so that the text is written in a clean, orthographically correct manner with proper punctuation. Use professional typographic quote marks and punctuation appropriate for the language.
 
 Whenever you split a longer utterance into cues, ensure that the split is logical and semantic. If you split an utterance mid-sentence, don’t start the 2nd cue with a capitalized word (unless it’s always capitalized). 
 
-If in doubt, use guidelines of the video streaming and broadcasting profession. 
+Try to keep semantic units of speech together. 
+
+In the WebVTT header, always indicate the language code, based on the supplied language info or on your own recognition. 
+
+If in doubt, use journalistic and broadcast guidelines when creating the transcript. 
 
 Now:
 
@@ -134,23 +144,23 @@ Now:
             PromptTemplate.BASIC_WEBVTT: f"""{prompt_intro}
 Please transcribe this audio and provide the output as a properly formatted WebVTT subtitle file.
 
-CRITICAL: Your response must be valid WebVTT format starting with "WEBVTT" and including precise timestamps.""",
+CRITICAL: Your response must be valid WebVTT format starting with `WEBVTT` and including precise timestamps.""",
             PromptTemplate.SPEAKER_DIARIZATION: f"""{prompt_intro}
 Please transcribe this audio with speaker identification and provide the output as a properly formatted WebVTT subtitle file with speaker tags, e.g., `<v Speaker1>`, `<v Speaker2>`.
 
-CRITICAL: Your response must be valid WebVTT format starting with "WEBVTT" and including precise timestamps and speaker identification.""",
+CRITICAL: Your response must be valid WebVTT format starting with `WEBVTT` and including precise timestamps and speaker identification.""",
             PromptTemplate.EMOTION_DETECTION: f"""{prompt_intro}
 Please transcribe this audio with emotion detection and provide the output as a properly formatted WebVTT subtitle file with emotional context, with non-verbal indicators prepending the spoken lines, `[laughs]`, `[sighs]`, `[applause]`, `[music]`).
 
-CRITICAL: Your response must be valid WebVTT format starting with "WEBVTT" and including precise timestamps and emotional indicators.""",
+CRITICAL: Your response must be valid WebVTT format starting with `WEBVTT` and including precise timestamps and emotional indicators.""",
             PromptTemplate.TECHNICAL_CONTENT: f"""{prompt_intro}
 Please transcribe this technical audio content with careful attention to specialized terminology and provide the output as a properly formatted WebVTT subtitle file.
 
-CRITICAL: Your response must be valid WebVTT format starting with "WEBVTT" and including precise timestamps.""",
+CRITICAL: Your response must be valid WebVTT format starting with `WEBVTT` and including precise timestamps.""",
             PromptTemplate.MULTILINGUAL: f"""{prompt_intro}
 Please transcribe this multilingual audio content and provide the output as a properly formatted WebVTT subtitle file with language identification where applicable.
 
-CRITICAL: Your response must be valid WebVTT format starting with "WEBVTT" and including precise timestamps.""",
+CRITICAL: Your response must be valid WebVTT format starting with `WEBVTT` and including precise timestamps.""",
         }
 
         return base_prompts.get(
