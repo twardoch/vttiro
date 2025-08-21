@@ -315,6 +315,6 @@ __version__.py
 _private
 VERSION.txt
 
-temp
-issues
-external
+temp/
+issues/
+external/
