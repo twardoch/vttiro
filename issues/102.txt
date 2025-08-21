@@ -1,0 +1,21 @@
+ $ vttiro formats
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.12/bin/vttiro", line 4, in <module>
+    from vttiro.cli import main
+  File "/Users/adam/Developer/vcs/github.twardoch/pub/vttiro/src/vttiro/__init__.py", line 27, in <module>
+    from vttiro.core.transcriber import Transcriber
+  File "/Users/adam/Developer/vcs/github.twardoch/pub/vttiro/src/vttiro/core/transcriber.py", line 16, in <module>
+    from vttiro.config.enhanced import EnhancedVttiroConfig
+  File "/Users/adam/Developer/vcs/github.twardoch/pub/vttiro/src/vttiro/config/enhanced.py", line 195, in <module>
+    class SecureApiConfig(BaseModel):
+  File "/Users/adam/Developer/vcs/github.twardoch/pub/vttiro/src/vttiro/config/enhanced.py", line 273, in SecureApiConfig
+    @root_validator
+     ^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/pydantic/deprecated/class_validators.py", line 234, in root_validator
+    return root_validator()(*__args)  # type: ignore
+           ^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/pydantic/deprecated/class_validators.py", line 240, in root_validator
+    raise PydanticUserError(
+pydantic.errors.PydanticUserError: If you use `@root_validator` with pre=False (the default) you MUST specify `skip_on_failure=True`. Note that `@root_validator` is deprecated and should be replaced with `@model_validator`.
+
+For further information visit https://errors.pydantic.dev/2.11/u/root-validator-pre-skip

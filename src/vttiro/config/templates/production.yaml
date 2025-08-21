@@ -1,0 +1,224 @@
+# this_file: src/vttiro/config/templates/production.yaml
+# Production Configuration Template for vttiro
+# This template is optimized for production deployment with security and performance
+
+config_version: "2.0"
+environment: "production"
+
+# API Configuration for Production
+api:
+  # API keys MUST be set via environment variables in production
+  gemini_api_key: null  # REQUIRED: Set GEMINI_API_KEY environment variable
+  assemblyai_api_key: null  # REQUIRED: Set ASSEMBLYAI_API_KEY environment variable
+  deepgram_api_key: null  # REQUIRED: Set DEEPGRAM_API_KEY environment variable
+  huggingface_token: null  # REQUIRED: Set HUGGINGFACE_TOKEN environment variable
+  
+  # Production-optimized timeouts
+  timeout_seconds: 120
+  max_retries: 5
+  retry_delay: 2.0
+  
+  # Strict rate limiting for production
+  rate_limit_per_minute: 300
+  burst_limit: 50
+
+# Processing Configuration for Production
+processing:
+  # Optimized chunks for production throughput
+  chunk_duration: 600  # 10 minutes
+  overlap_duration: 30  # 30 seconds
+  max_duration: 36000  # 10 hours
+  sample_rate: 16000
+  prefer_integer_seconds: true
+  
+  # Production-optimized settings
+  energy_threshold_percentile: 20
+  min_energy_window: 2.0
+  
+  # Parallel processing (optimized for production)
+  max_workers: null  # Auto-detect based on CPU cores
+  worker_timeout: 600
+  enable_gpu: true  # Use GPU acceleration when available
+
+# Validation Configuration for Production
+validation:
+  # Strict validation for production security
+  strict_mode: true
+  validate_on_load: true
+  
+  # File validation (security-focused)
+  max_file_size_mb: 2048  # 2GB limit
+  allowed_domains: ["youtube.com", "youtu.be"]  # Restrict to known safe domains
+  allowed_file_types: [".mp4", ".avi", ".mov", ".mp3", ".wav", ".m4a", ".webm"]
+
+# Caching Configuration for Production
+caching:
+  enabled: true
+  
+  # Memory cache (larger for production)
+  memory_cache_size: 200
+  memory_ttl_seconds: 3600  # 1 hour
+  
+  # Disk cache (production storage)
+  disk_cache_enabled: true
+  disk_cache_path: "/var/cache/vttiro"
+  disk_cache_size_mb: 10240  # 10GB
+  disk_ttl_seconds: 604800  # 1 week
+  
+
+# Monitoring Configuration for Production
+monitoring:
+  enabled: true
+  
+  # Logging (production-optimized)
+  log_level: "INFO"
+  log_to_file: true
+  log_file_path: "/var/log/vttiro/vttiro.log"
+  log_rotation_size_mb: 100
+  log_retention_days: 30
+  structured_logging: true
+  
+  # Metrics (comprehensive for production)
+  metrics_enabled: true
+  metrics_port: 9090  # Prometheus metrics port
+  detailed_metrics: true
+  export_prometheus: true
+  
+  # Health checks
+  health_check_enabled: true
+  health_check_port: 8080
+  health_check_path: "/health"
+  readiness_check_path: "/ready"
+  
+  # Alerting
+  alerting_enabled: true
+  error_threshold: 0.05  # 5% error rate threshold
+  latency_threshold_seconds: 30
+
+# Security Configuration for Production
+security:
+  # Strict security for production
+  encryption_enabled: true
+  api_key_validation: true
+  rate_limiting_enabled: true
+  
+  # CORS (restrictive for production)
+  cors_enabled: false  # Disable unless specifically needed
+  cors_origins: []  # Specify allowed origins if CORS is enabled
+  
+  # Input sanitization
+  input_sanitization: true
+  path_traversal_protection: true
+  
+  # Audit logging
+  audit_logging: true
+  audit_log_path: "/var/log/vttiro/audit.log"
+
+# Output Configuration for Production
+output:
+  default_format: "webvtt"
+  max_chars_per_line: 42
+  max_lines_per_cue: 2
+  max_cue_duration: 7.0
+  reading_speed_wpm: 160
+  
+  # Accessibility (full compliance)
+  wcag_compliance: "AA"
+  include_sound_descriptions: true
+  
+  # Production output settings
+  output_directory: "/var/lib/vttiro/output"
+  backup_enabled: true
+  backup_directory: "/var/lib/vttiro/backups"
+  backup_retention_days: 7
+
+# AI Model Configuration for Production
+models:
+  # Production model selection strategy
+  default_provider: "gemini"
+  fallback_providers: ["assemblyai", "deepgram"]
+  
+  # Circuit breaker settings for production
+  circuit_breaker_enabled: true
+  failure_threshold: 5
+  recovery_timeout: 60
+  
+  # Model-specific settings optimized for production quality
+  gemini:
+    model_name: "gemini-2.0-flash"
+    temperature: 0.0  # Deterministic for production
+    enable_streaming: true
+    timeout_seconds: 120
+  
+  assemblyai:
+    model_name: "universal-2"
+    enable_diarization: true
+    enable_punctuation: true
+    timeout_seconds: 180
+  
+  deepgram:
+    model_name: "nova-3"
+    enable_smart_format: true
+    enable_profanity_filter: true
+    timeout_seconds: 120
+
+# Feature Flags for Production
+features:
+  # Production-ready features only
+  speaker_diarization: true
+  emotion_detection: true
+  auto_segmentation: true
+  context_aware_prompting: true
+  
+  # YouTube integration (production settings)
+  youtube_integration: true
+  auto_upload_subtitles: false  # Require explicit user action
+
+# Production-specific settings
+production:
+  # Performance settings
+  enable_performance_monitoring: true
+  performance_metrics_interval: 60  # seconds
+  
+  # Resource management
+  memory_monitoring: true
+  memory_threshold_mb: 8192  # 8GB
+  disk_monitoring: true
+  disk_threshold_percent: 85
+  
+  # Scaling
+  auto_scaling_enabled: false  # Handled by orchestration platform
+  max_concurrent_jobs: 50
+  job_queue_size: 200
+  
+  # Maintenance
+  maintenance_mode: false
+  maintenance_message: "Service temporarily unavailable for maintenance"
+  
+  # Backup and recovery
+  backup_enabled: true
+  backup_schedule: "0 2 * * *"  # Daily at 2 AM
+  backup_retention_days: 30
+  
+  # Deployment
+  deployment_environment: "production"
+  service_name: "vttiro"
+  service_version: null  # Set via CI/CD pipeline
+  
+# Container and Orchestration Settings
+container:
+  # Resource limits for containerized deployment
+  memory_limit: "16Gi"
+  cpu_limit: "8"
+  memory_request: "8Gi"
+  cpu_request: "4"
+  
+  # Health check settings
+  liveness_probe_path: "/health"
+  readiness_probe_path: "/ready"
+  startup_probe_path: "/health"
+  
+  # Volume mounts
+  cache_volume: "/var/cache/vttiro"
+  log_volume: "/var/log/vttiro"
+  config_volume: "/etc/vttiro"

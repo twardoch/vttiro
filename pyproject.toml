@@ -11,10 +11,12 @@
 #------------------------------------------------------------------------------
 [project]
 name = 'vttiro' # Package name on PyPI
-description = '' # Short description
+description = 'Simple video transcription to WebVTT subtitles using AI models (Gemini, AssemblyAI, Deepgram)' # Short description
 readme = 'README.md' # Path to README file
-requires-python = '>=3.10' # Minimum Python version
+requires-python = '>=3.12' # Minimum Python version (updated to 3.12+ for modern features)
 keywords = [
+    'transcription', 'video', 'audio', 'webvtt', 'subtitles', 'ai', 'speech-to-text',
+    'speaker-diarization', 'emotion-detection', 'youtube', 'whisper', 'gemini'
 ] # Keywords for PyPI search
 dynamic = ["version"] # Fields set dynamically at build time
 
@@ -22,17 +24,28 @@ dynamic = ["version"] # Fields set dynamically at build time
 classifiers = [
     'Development Status :: 4 - Beta', # Package maturity level
     'Programming Language :: Python',
-    'Programming Language :: Python :: 3.10',
-    'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: Implementation :: CPython',
-    'Programming Language :: Python :: Implementation :: PyPy',
     'Operating System :: OS Independent',
     'License :: OSI Approved :: MIT License',
     'Intended Audience :: Developers',
+    'Topic :: Multimedia :: Video',
+    'Topic :: Multimedia :: Sound/Audio :: Speech',
+    'Topic :: Scientific/Engineering :: Artificial Intelligence',
+    'Topic :: Text Processing :: Linguistic',
 ]
 
+# Core dependencies required for all installation modes
 dependencies = [
+    'pydantic>=2.5.0',          # Data validation and settings management
+    'loguru>=0.7.2',            # Advanced logging with structured output
+    'fire>=0.5.0',              # CLI framework
+    'rich>=13.7.0',             # Beautiful terminal output and progress bars
+    'pyyaml>=6.0.1',            # YAML configuration support
+    'httpx>=0.26.0',            # Modern HTTP client for async requests
+    'yt-dlp>=2024.12.13',       # Video downloading and processing
+    'ffmpeg-python>=0.2.0',     # FFmpeg integration for audio processing
+    'psutil>=6.1.0',            # System resource monitoring for performance metrics
 ]
 
 # Author information
@@ -56,35 +69,102 @@ Source = 'https://github.com/twardoch/vttiro'
 #------------------------------------------------------------------------------
 [project.optional-dependencies]
 
+# Basic mode: API-only transcription services (default installation)
+basic = [
+    'google-generativeai>=0.8.3',    # Google Gemini 2.0 Flash API
+    'assemblyai>=0.36.1',             # AssemblyAI Universal-2 API
+    'deepgram-sdk>=3.7.2',            # Deepgram Nova-3 API
+    'google-api-python-client>=2.151.0',  # YouTube Data API
+    'google-auth-oauthlib>=1.2.1',    # YouTube OAuth authentication
+]
+
+# Local mode: Local inference capabilities with GPU/CPU support
+local = [
+    'torch>=2.1.2',                   # PyTorch for local inference
+    'torchaudio>=2.1.2',              # Audio processing with PyTorch
+    'transformers>=4.36.2',           # HuggingFace transformers
+    'pyannote.audio>=3.1.1',          # Speaker diarization (requires HF token)
+    'speechbrain>=1.0.0',             # Speech emotion recognition
+    'librosa>=0.10.1',                # Audio analysis and feature extraction
+    'numpy>=1.26.2',                  # Numerical processing
+    'scipy>=1.11.4',                  # Signal processing
+    'scikit-learn>=1.3.2',            # Machine learning utilities
+    'whisperx>=3.1.5',                # Enhanced Whisper with alignment
+    'faster-whisper>=1.0.3',          # Optimized Whisper inference
+    'openai-whisper>=20231117',       # Original OpenAI Whisper
+]
+
+# Colab mode: Google Colab integration with UI widgets
+colab = [
+    'ipython>=8.18.1',                # Interactive Python for Colab
+    'ipywidgets>=8.1.1',              # Interactive widgets for Jupyter/Colab
+    'jupyter>=1.0.0',                 # Jupyter notebook support
+    'matplotlib>=3.8.2',              # Plotting for visualizations
+    'seaborn>=0.13.0',                # Enhanced plotting
+    'plotly>=5.17.0',                 # Interactive plots
+    'tqdm>=4.66.1',                   # Progress bars in notebooks
+]
+
+# All mode: Complete installation with all features
+all = [
+    'google-generativeai>=0.8.3',     # API dependencies
+    'assemblyai>=0.36.1',
+    'deepgram-sdk>=3.7.2',
+    'google-api-python-client>=2.151.0',
+    'google-auth-oauthlib>=1.2.1',
+    'torch>=2.1.2',                   # Local inference dependencies
+    'torchaudio>=2.1.2',
+    'transformers>=4.36.2',
+    'pyannote.audio>=3.1.1',
+    'speechbrain>=1.0.0',
+    'librosa>=0.10.1',
+    'numpy>=1.26.2',
+    'scipy>=1.11.4',
+    'scikit-learn>=1.3.2',
+    'whisperx>=3.1.5',
+    'faster-whisper>=1.0.3',
+    'openai-whisper>=20231117',
+    'ipython>=8.18.1',                # Colab dependencies
+    'ipywidgets>=8.1.1',
+    'jupyter>=1.0.0',
+    'matplotlib>=3.8.2',
+    'seaborn>=0.13.0',
+    'plotly>=5.17.0',
+    'tqdm>=4.66.1',
+]
+
 # Development tools
 dev = [
-    'pre-commit>=4.1.0', # Pre-commit hook manager - Keep pre-commit as is, update if newer pre-commit version is required
-    'ruff>=0.9.7', # Linting and formatting - Keep ruff as is, update if newer ruff version is required
-    'mypy>=1.15.0', # Type checking - Keep mypy as is, update if newer mypy version is required
-    'absolufy-imports>=0.3.1', # Convert relative imports to absolute - Keep absolufy-imports as is, update if newer absolufy-imports version is required
-    'pyupgrade>=3.19.1', # Upgrade Python syntax - Keep pyupgrade as is, update if newer pyupgrade version is required
-    'isort>=6.0.1', # Sort imports - Keep isort as is, update if newer isort version is required
+    'pre-commit>=4.1.0',
+    'ruff>=0.9.7',
+    'mypy>=1.15.0',
+    'absolufy-imports>=0.3.1',
+    'pyupgrade>=3.19.1',
+    'isort>=6.0.1',
 ]
 
 # Testing tools and frameworks
 test = [
-    'pytest>=8.3.4', # Testing framework - Keep pytest as is, update if newer pytest version is required
-    'pytest-cov>=6.0.0', # Coverage plugin for pytest - Keep pytest-cov as is, update if newer pytest-cov version is required
-    'pytest-xdist>=3.6.1', # Parallel test execution - Keep pytest-xdist as is, update if newer pytest-xdist version is required
-    'pytest-benchmark[histogram]>=5.1.0', # Benchmarking plugin - Keep pytest-benchmark as is, update if newer pytest-benchmark version is required
-    'pytest-asyncio>=0.25.3', # Async test support - Keep pytest-asyncio as is, update if newer pytest-asyncio version is required
+    'pytest>=8.3.4',
+    'pytest-cov>=6.0.0',
+    'pytest-xdist>=3.6.1',
+    'pytest-benchmark[histogram]>=5.1.0',
+    'pytest-asyncio>=0.25.3',
+    'pytest-timeout>=2.3.1',        # Test timeout protection
+    'pytest-mock>=3.12.0',          # Enhanced mocking capabilities
     'coverage[toml]>=7.6.12',
+    'hypothesis>=6.98.0',            # Property-based testing
+    'memory-profiler>=0.61.0',      # Memory usage profiling
+    'factory-boy>=3.3.0',           # Test data factories
+    'freezegun>=1.4.0',             # Time mocking for tests
 ]
 
+# Documentation dependencies
 docs = [
     "sphinx>=7.2.6",
     "sphinx-rtd-theme>=2.0.0",
     "sphinx-autodoc-typehints>=2.0.0",
-    "myst-parser>=3.0.0", # Markdown support in Sphinx
-]
-
-# All optional dependencies combined
-all = [
+    "myst-parser>=3.0.0",
 ]
 
 #------------------------------------------------------------------------------
@@ -92,7 +172,7 @@ all = [
 # Entry points for command-line executables installed with the package.
 #------------------------------------------------------------------------------
 [project.scripts]
-# CLINAME = "vttiro.__main__:main"
+vttiro = "vttiro.cli:main"
 
 #------------------------------------------------------------------------------
 # BUILD SYSTEM CONFIGURATION
@@ -302,9 +382,12 @@ markers = [
     "benchmark: marks tests as benchmarks (select with '-m benchmark')",
     "unit: mark a test as a unit test",
     "integration: mark a test as an integration test",
-    "permutation: tests for permutation functionality", 
-    "parameter: tests for parameter parsing",
-    "prompt: tests for prompt parsing",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "network: marks tests that require network access",
+    "api: marks tests that require API keys",
+    "gpu: marks tests that require GPU",
+    "property: marks property-based tests using Hypothesis",
+    "performance: marks performance and scalability tests",
 ]
 norecursedirs = [
     ".*",

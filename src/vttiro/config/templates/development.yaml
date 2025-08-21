@@ -1,0 +1,164 @@
+# this_file: src/vttiro/config/templates/development.yaml
+# Development Configuration Template for vttiro
+# This template is optimized for local development with debugging enabled
+
+config_version: "2.0"
+environment: "development"
+
+# API Configuration for Development
+api:
+  # Add your API keys here or use environment variables
+  gemini_api_key: null  # Set GEMINI_API_KEY environment variable
+  assemblyai_api_key: null  # Set ASSEMBLYAI_API_KEY environment variable
+  deepgram_api_key: null  # Set DEEPGRAM_API_KEY environment variable
+  huggingface_token: null  # Set HUGGINGFACE_TOKEN environment variable
+  
+  # Development-friendly timeouts
+  timeout_seconds: 60
+  max_retries: 2
+  retry_delay: 1.0
+  
+  # Rate limiting (relaxed for development)
+  rate_limit_per_minute: 100
+  burst_limit: 20
+
+# Processing Configuration for Development
+processing:
+  # Smaller chunks for faster development iteration
+  chunk_duration: 300  # 5 minutes
+  overlap_duration: 15  # 15 seconds
+  max_duration: 18000  # 5 hours
+  sample_rate: 16000
+  prefer_integer_seconds: true
+  
+  # Development-optimized settings
+  energy_threshold_percentile: 25
+  min_energy_window: 1.5
+  
+  # Parallel processing (conservative for development)
+  max_workers: 2
+  worker_timeout: 300
+  enable_gpu: false  # Disable GPU for development unless needed
+
+# Validation Configuration
+validation:
+  # Relaxed validation for development
+  strict_mode: false
+  validate_on_load: true
+  
+  # File validation
+  max_file_size_mb: 500
+  allowed_domains: ["youtube.com", "youtu.be", "localhost"]
+  allowed_file_types: [".mp4", ".avi", ".mov", ".mp3", ".wav", ".m4a"]
+
+# Caching Configuration for Development
+caching:
+  enabled: true
+  
+  # Memory cache (smaller for development)
+  memory_cache_size: 50
+  memory_ttl_seconds: 1800  # 30 minutes
+  
+  # Disk cache (local development directory)
+  disk_cache_enabled: true
+  disk_cache_path: "~/.cache/vttiro/dev"
+  disk_cache_size_mb: 500
+  disk_ttl_seconds: 86400  # 1 day
+  
+
+# Monitoring Configuration for Development
+monitoring:
+  enabled: true
+  
+  # Logging
+  log_level: "DEBUG"
+  log_to_file: true
+  log_file_path: "logs/vttiro-dev.log"
+  log_rotation_size_mb: 50
+  log_retention_days: 7
+  
+  # Metrics (lightweight for development)
+  metrics_enabled: true
+  metrics_port: 8080
+  detailed_metrics: true
+  
+  # Health checks
+  health_check_enabled: true
+  health_check_port: 8081
+
+# Security Configuration for Development
+security:
+  # Relaxed security for development convenience
+  encryption_enabled: false  # Can be disabled for development
+  api_key_validation: false
+  rate_limiting_enabled: false
+  
+  # CORS (permissive for development)
+  cors_enabled: true
+  cors_origins: ["http://localhost:*", "http://127.0.0.1:*"]
+
+# Output Configuration
+output:
+  default_format: "webvtt"
+  max_chars_per_line: 42
+  max_lines_per_cue: 2
+  max_cue_duration: 7.0
+  reading_speed_wpm: 160
+  
+  # Accessibility (standard settings)
+  wcag_compliance: "AA"
+  include_sound_descriptions: true
+  
+  # Development output settings
+  output_directory: "output"
+  backup_enabled: false
+
+# AI Model Configuration for Development
+models:
+  # Default model selection for development
+  default_provider: "gemini"
+  fallback_providers: ["assemblyai", "deepgram"]
+  
+  # Model-specific settings optimized for development speed
+  gemini:
+    model_name: "gemini-2.0-flash-exp"
+    temperature: 0.1
+    enable_streaming: true
+  
+  assemblyai:
+    model_name: "universal-2"
+    enable_diarization: true
+    enable_punctuation: true
+  
+  deepgram:
+    model_name: "nova-2"
+    enable_smart_format: true
+    enable_profanity_filter: false
+
+# Feature Flags for Development
+features:
+  # Enable experimental features in development
+  speaker_diarization: true
+  emotion_detection: false  # Disable for faster processing
+  auto_segmentation: true
+  context_aware_prompting: true
+  
+  # YouTube integration
+  youtube_integration: false  # Disable unless testing YouTube features
+  auto_upload_subtitles: false
+
+# Development-specific settings
+development:
+  # Debug settings
+  debug_mode: true
+  verbose_logging: true
+  save_intermediate_files: true
+  intermediate_files_path: "debug"
+  
+  # Development tools
+  enable_profiling: false
+  profile_output_path: "profiles"
+  
+  # Hot reloading
+  hot_reload_config: true
+  config_watch_interval: 5  # seconds

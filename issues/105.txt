@@ -1,0 +1,322 @@
+
+@ Issue 105
+
+Here is our project: 
+
+AGENT.md
+AGENTS.md
+CHANGELOG.md
+CLAUDE.md
+GEMINI.md
+LICENSE
+PLAN.md
+README.md
+TLDR.md
+TODO.md
+WORK.md
+dist/
+dist/.gitkeep
+external/
+external/README.md
+external/ref/
+external/ref/google-gemini-genai-processors.txt
+external/ref/googleapis-python-genai.txt
+external/ref/googleapis_github_io_python-genai.txt
+external/ref/llms.txt
+external/research/
+external/research/res1.md
+external/research/res2.md
+external/research/res3.md
+external/research/res4.md
+issues/
+issues/101.txt
+issues/102.txt
+issues/103.txt
+issues/104.txt
+issues/105.txt
+llms.txt
+package.toml
+plan/
+plan/part1.md
+plan/part2.md
+plan/part3.md
+plan/part4.md
+plan/part5.md
+plan/part6.md
+plan/part7.md
+plan/part8.md
+plan/part9.md
+pyproject.toml
+pytest.ini
+src/
+src/vttiro/
+src/vttiro/__init__.py
+src/vttiro/cli.py
+src/vttiro/config/
+src/vttiro/config/__init__.py
+src/vttiro/config/enhanced.py
+src/vttiro/config/templates/
+src/vttiro/config/templates/development.yaml
+src/vttiro/config/templates/production.yaml
+src/vttiro/config/templates/testing.yaml
+src/vttiro/core/
+src/vttiro/core/__init__.py
+src/vttiro/core/config.py
+src/vttiro/core/file_transcriber.py
+src/vttiro/core/transcriber.py
+src/vttiro/core/transcription.py
+src/vttiro/diarization/
+src/vttiro/diarization/__init__.py
+src/vttiro/diarization/core.py
+src/vttiro/emotion/
+src/vttiro/emotion/__init__.py
+src/vttiro/integrations/
+src/vttiro/integrations/__init__.py
+src/vttiro/models/
+src/vttiro/models/__init__.py
+src/vttiro/models/assemblyai.py
+src/vttiro/models/base.py
+src/vttiro/models/deepgram.py
+src/vttiro/models/gemini.py
+src/vttiro/output/
+src/vttiro/output/__init__.py
+src/vttiro/output/simple_webvtt.py
+src/vttiro/processing/
+src/vttiro/processing/__init__.py
+src/vttiro/processing/optimized_audio.py
+src/vttiro/processing/parallel.py
+src/vttiro/processing/simple_audio.py
+src/vttiro/processing/video.py
+src/vttiro/segmentation/
+src/vttiro/segmentation/__init__.py
+src/vttiro/segmentation/boundaries.py
+src/vttiro/segmentation/core.py
+src/vttiro/segmentation/energy.py
+src/vttiro/utils/
+src/vttiro/utils/__init__.py
+src/vttiro/utils/exceptions.py
+src/vttiro/vttiro.py
+temp/
+temp/test1.sh
+temp/test2.gemini-2.5-flash.vtt
+temp/test2.mp4
+tests/
+tests/conftest.py
+tests/factories.py
+tests/run_tests.py
+tests/test_config.py
+tests/test_engine_model_selection.py
+tests/test_enhanced_config.py
+tests/test_error_handling.py
+tests/test_package.py
+tests/test_performance.py
+tests/test_property_based.py
+tests/test_transcriber_integration.py
+tests/test_video_processing.py
+
+
+In @temp I run @temp/test1.sh which is:
+
+```
+for model in gemini-2.5-flash ; do
+    echo $model
+    time vttiro transcribe -e gemini -m $model -i test2.mp4 -o test2.$model.vtt 
+done
+```
+
+and I get 
+
+```
+gemini-2.5-flash
+Transcribing test2.mp4...
+Engine: gemini
+Model: gemini-2.5-flash
+2025-08-21 20:17:57.669 | DEBUG    | vttiro.processing.simple_audio:__init__:45 - SimpleAudioProcessor initialized
+2025-08-21 20:17:57.669 | INFO     | vttiro.core.file_transcriber:__init__:64 - FileTranscriber initialized
+🎬 Starting transcription...
+2025-08-21 20:17:57.670 | INFO     | vttiro.core.file_transcriber:transcribe_file:238 - [caf51931] Starting transcription: test2.mp4 -> test2.gemini-2.5-flash.vtt
+2025-08-21 20:17:57.670 | DEBUG    | vttiro.processing.simple_audio:validate_file:81 - File validation passed: test2.mp4
+2025-08-21 20:17:57.670 | DEBUG    | vttiro.processing.simple_audio:validate_file:81 - File validation passed: test2.mp4
+2025-08-21 20:17:57.671 | INFO     | vttiro.processing.simple_audio:extract_audio:140 - Extracting audio: test2.mp4 -> test2.wav
+2025-08-21 20:17:57.671 | DEBUG    | vttiro.processing.simple_audio:extract_audio:141 - ffmpeg command: ffmpeg -i test2.mp4 -vn -acodec pcm_s16le -ar 16000 -ac 1 -y -loglevel warning /var/folders/05/clcynl0509ldxltl599hhhx40000gn/T/tmpnge32pqr/test2.wav
+⠴ Processing audio...2025-08-21 20:17:58.212 | INFO     | vttiro.processing.simple_audio:extract_audio:162 - Audio extraction successful: test2.wav (2.3MB)
+2025-08-21 20:17:58.213 | INFO     | vttiro.core.file_transcriber:transcribe_file:270 - [caf51931] Transcribing audio file: test2.wav with gemini/gemini-2.5-flash
+2025-08-21 20:17:58.213 | INFO     | vttiro.core.file_transcriber:_transcribe_with_retry:165 - [caf51931] Transcription attempt 1/3
+2025-08-21 20:17:58.213 | INFO     | vttiro.models.gemini:transcribe:86 - Transcribing with Gemini: /var/folders/05/clcynl0509ldxltl599hhhx40000gn/T/tmpnge32pqr/test2.wav
+2025-08-21 20:17:58.213 | DEBUG    | vttiro.models.gemini:_upload_audio_file:139 - Uploading audio file to Gemini: /var/folders/05/clcynl0509ldxltl599hhhx40000gn/T/tmpnge32pqr/test2.wav
+⠋ Processing audio...2025-08-21 20:18:03.489 | DEBUG    | vttiro.models.gemini:_upload_audio_file:147 - Audio file uploaded successfully: test2.wav
+⠴ Processing audio...2025-08-21 20:18:09.430 | INFO     | vttiro.models.gemini:transcribe:112 - Gemini transcription completed in 11.22s
+2025-08-21 20:18:09.430 | INFO     | vttiro.core.file_transcriber:_transcribe_with_retry:173 - [caf51931] Transcription successful on attempt 1
+2025-08-21 20:18:09.431 | DEBUG    | vttiro.output.simple_webvtt:__init__:62 - SimpleWebVTTGenerator initialized with 50 chars/line
+2025-08-21 20:18:09.432 | INFO     | vttiro.output.simple_webvtt:generate_webvtt:104 - WebVTT file generated: test2.gemini-2.5-flash.vtt (14 cues)
+2025-08-21 20:18:09.432 | DEBUG    | vttiro.core.file_transcriber:_save_webvtt:320 - WebVTT file saved: test2.gemini-2.5-flash.vtt
+2025-08-21 20:18:09.433 | DEBUG    | vttiro.processing.simple_audio:cleanup_temp_files:243 - Cleaned up temp file: /var/folders/05/clcynl0509ldxltl599hhhx40000gn/T/tmpnge32pqr/test2.wav
+2025-08-21 20:18:09.433 | DEBUG    | vttiro.processing.simple_audio:cleanup_temp_files:246 - Cleaned up temp directory: /var/folders/05/clcynl0509ldxltl599hhhx40000gn/T/tmpnge32pqr
+2025-08-21 20:18:09.433 | INFO     | vttiro.core.file_transcriber:transcribe_file:281 - [caf51931] Transcription completed successfully: test2.gemini-2.5-flash.vtt (took 11.76s)
+✓ Success! Transcription saved to test2.gemini-2.5-flash.vtt
+test2.gemini-2.5-flash.vtt
+```
+
+And the vtt is: 
+
+```
+WEBVTT
+Language: auto
+
+cue-0001
+00:00:00.000 --> 00:00:03.567
+Hmm hmm. Hi guys. Dave Lawrence from the
+California Type Foundry here. Uh I am going to be
+
+cue-0002
+00:00:03.667 --> 00:00:04.667
+you in FontLab
+
+cue-0003
+00:00:07.333 --> 00:00:10.667
+7 how I make some of my type faces. Uh I started
+using uh FontLab 6. It was uh the 2018 and
+
+cue-0004
+00:00:14.667 --> 00:00:14.233
+Uh and then I started when FontLab 7 came out, I
+switched over to that in 2019. Um I like FontLab
+
+cue-0005
+00:00:14.333 --> 00:00:14.833
+because
+
+cue-0006
+00:00:22.000 --> 00:00:19.567
+It has some really powerful drawing tools, there's
+many ways you can draw. Uh the way that you can
+
+cue-0007
+00:00:19.667 --> 00:00:20.167
+switch between masters
+
+cue-0008
+00:00:29.333 --> 00:00:24.733
+Allows you to do a lot of uh different you can
+basically it customizes to your workflow. And uh
+
+cue-0009
+00:00:24.833 --> 00:00:25.333
+beyond that,
+
+cue-0010
+00:00:36.333 --> 00:00:30.067
+Uh the panels feature in InDesign. Uh I mean it
+has the features like the Adobe products. So since
+
+cue-0011
+00:00:30.167 --> 00:00:30.667
+I'm used to
+
+cue-0012
+00:00:43.667 --> 00:00:35.400
+That from InDesign and some of those other things,
+it has that. So, it has a lot of powerful
+
+cue-0013
+00:00:35.500 --> 00:00:36.000
+features that can
+
+cue-0014
+00:00:51.000 --> 00:00:57.000
+Help you get everything done down to the smallest
+detail. Okay. So, I'll see you onto the videos.
+```
+
+## Here are some remarks: 
+
+Looking at this WebVTT file, I can identify several critical problems:
+
+## 1. **Invalid Timestamp Ranges**
+Multiple cues have end times that occur *before* their start times, which is invalid:
+- **cue-0004**: `00:00:14.667 --> 00:00:14.233` (ends 0.434 seconds before it starts!)
+- **cue-0006**: `00:00:22.000 --> 00:00:19.567` (ends 2.433 seconds before it starts!)
+- **cue-0008**: `00:00:29.333 --> 00:00:24.733` (ends 4.6 seconds before it starts!)
+- **cue-0010**: `00:00:36.333 --> 00:00:30.067` (ends 6.266 seconds before it starts!)
+- **cue-0012**: `00:00:43.667 --> 00:00:35.400` (ends 8.267 seconds before it starts!)
+
+## 2. **Non-Sequential Timeline**
+The start times jump around erratically instead of progressing forward:
+- Goes from 14.667 (cue-0004) back to 14.333 (cue-0005)
+- Jumps from 14.833 to 22.000, then the end time goes back to 19.567
+- This pattern continues throughout, creating a completely scrambled timeline
+
+## 3. **Text Segmentation Issues**
+The text appears to be improperly split mid-sentence:
+- cue-0001 ends with "Uh I am going to be"
+- cue-0002 continues oddly with just "you in FontLab"
+- cue-0003 has only "7 how I make some of my type faces..."
+
+The content doesn't flow naturally between cues, suggesting the speech-to-text or segmentation process failed.
+
+## 4. **Probable Total Duration Issue**
+The last cue (cue-0014) runs from `00:00:51.000 --> 00:00:57.000`, suggesting the entire video is only 57 seconds long, but the content and pacing seem wrong for such a short duration given the amount of information being conveyed.
+
+## 5. **Content Coherence**
+Reading the text sequentially doesn't make grammatical sense. For example:
+- "Uh I am going to be you in FontLab 7 how I make some of my type faces"
+- This suggests either words are missing or the cues are in the wrong order.
+
+## Root Cause Analysis
+This appears to be the result of a failed automatic transcription or subtitle generation process, possibly from Gemini 2.5 Flash (based on the filename). The system seems to have:
+1. Incorrectly detected speech boundaries
+2. Scrambled the temporal ordering
+3. Possibly confused or swapped timestamp values
+
+## Recommendation
+This file needs to be completely regenerated. The transcription should be re-run with proper timestamp synchronization, or the file should be manually corrected with:
+1. Proper sequential timestamps
+2. Correct text segmentation at natural speech boundaries
+3. Verification that all timestamp ranges are valid (end time > start time)
+
+
+# Also: 
+
+- [ ] When I play the video with these subtitles in Movist Pro, I get "cue-NNNN" flashing on the screen. Are these "cue-0001" etc official part of WebVTT? Are they mandatory? Can we make them optional and only appear if I supply `--add_cues`? 
+
+- [ ] All the notes above are valid and problematic. 
+
+- [ ] Generally the content of the transcription is OK but the timings are VERY OFF. THE SOLUTION IS THAT WE DON’T ASK GEMINI FOR PLAIN TEXT, BUT FOR A NICELY ORGANIZED WebVTT! We must prompt Gemini for a WebVTT for the current chunk. Of course our responsibility will be to parse the outputs and then combine the per-chunk VTTs into one. 
+
+- [ ] Move the default Gemini prompt to some common module (so that other engines will be able to use it), and include an example of the format we want (the WebVTT). In the example, include sparse examples of nonverbal indicators for emotion etc. (in square brackets), and of speaker diarization (as WebVTT standard recommends it). 
+
+- [ ] Whenever possible we must retrieve native timestamps or a WebVTT or a .SRT file from the other transcription engines as well. 
+
+- [ ] With --full_prompt CLI arg I should replace the default prompt. With --xtra_prompt CLI arg I should be able to add to the prompt (either default or the one provided in full_prompt). 
+
+- [ ] With --keep_audio the tool should save the audio file next to the input video with the same basename. If an audio file already exists next to a video (with the same basename), we should not generate a new one but use it.  
+
+- [ ] Code example for Gemini: 
+
+```
+from google.genai import types
+
+with open('path/to/small-sample.mp3', 'rb') as f:
+    audio_bytes = f.read()
+
+response = client.models.generate_content(
+  model='gemini-2.5-flash',
+  contents=[
+    'Describe this audio clip',
+    types.Part.from_bytes(
+      data=audio_bytes,
+      mime_type='audio/mp3',
+    )
+  ]
+)
+
+print(response.text)
+```
+
+Note that you have extensive Gemini API documentation in external/ref/google-gemini-genai-processors.txt and external/ref/googleapis-python-genai.txt and external/ref/googleapis_github_io_python-genai.txt
+
+- [ ] Make sure we save the audio to an MP3, not a WAV. 
+
+- [ ] Verify that each audio chunk is <20 MB and if not, split the chunk into two chunks (at around half the time). 
+
+FOR ALL OF THE ISSUES ABOVE, think hard, study the existing code as appropriate and then /plan solutions for these issues in detail into @PLAN.md and @TODO.md. Only then start to /work 
