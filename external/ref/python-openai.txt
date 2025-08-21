@@ -1,1 +1,0 @@
-https://context7.com/openai/openai-python/llms.txt

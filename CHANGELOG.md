@@ -1205,3 +1205,59 @@ vttiro models --engine openai  # Lists: whisper-1, gpt-4o-transcribe, gpt-4o-min
 - **Professional Presentation**: Documentation completeness matches enterprise standards
 - **Feature Visibility**: All implemented engines properly documented and accessible
 - **User Experience**: Clear guidance for OpenAI API setup and model selection
+
+---
+
+## [Configuration System Bug Fixes & Module Integration] - 2025-08-21
+
+### 🔧 **Critical Configuration Access Issues Resolved** - ✅ **COMPLETED**
+
+Fixed fundamental configuration access problems that were preventing successful transcription operations.
+
+#### Critical Bug Fixes ✅
+- **Fixed VttiroConfig API Key Access**: Corrected incorrect attribute access in `FileTranscriber._convert_enhanced_config()`
+  - Problem: Code attempted to pass `gemini_api_key` directly to VttiroConfig constructor
+  - Solution: Properly set API keys through `config.transcription.gemini_api_key` sub-configuration
+  - Impact: Eliminated `'VttiroConfig' object has no attribute 'gemini_api_key'` errors
+
+- **Fixed Configuration Validation Issues**: Updated `src/vttiro/utils/config_validation.py` for correct config structure
+  - Fixed `_validate_api_keys()` to use `config.transcription.*` instead of direct config access
+  - Fixed `_validate_api_connectivity()` to access API keys through proper sub-configs
+  - Fixed `_validate_value_ranges()` to use sub-config paths for all settings
+  - Fixed `_validate_config_structure()` to validate hierarchical configuration properly
+
+#### Module Integration Enhancement ✅
+- **Created `src/vttiro/__main__.py`**: Enabled package execution with `python -m vttiro`
+  - Simple entry point that imports and calls CLI main function
+  - Follows Python packaging best practices for module execution
+  - Maintains all existing functionality while adding new execution method
+  - Verified working with full transcription pipeline
+
+#### Configuration Architecture Corrections ✅
+- **Sub-Configuration Structure**: Ensured all configuration access uses proper hierarchy:
+  - `config.transcription.*` for API keys and transcription settings
+  - `config.processing.*` for audio processing parameters  
+  - `config.output.*` for WebVTT generation settings
+  - `config.diarization.*`, `config.emotion.*`, `config.youtube.*` for specialized features
+
+- **Error Handling Enhancement**: Improved error messages and validation throughout config system
+- **Backward Compatibility**: Maintained compatibility while fixing access patterns
+
+#### Verification Results ✅
+- **Complete Transcription Pipeline**: Verified end-to-end transcription with Gemini models working successfully
+- **Module Execution**: Confirmed `python -m vttiro transcribe` commands work perfectly
+- **Configuration Validation**: All validation methods now properly access config structure
+- **Performance**: 24-second transcription with full WebVTT output generation
+
+### 📊 **Technical Improvements Achieved**
+- ✅ **Configuration Access**: Fixed all incorrect direct config attribute access
+- ✅ **Validation System**: Corrected validation to use proper sub-config structure
+- ✅ **Module Integration**: Added standard Python module execution capability
+- ✅ **Error Resolution**: Eliminated critical configuration-related runtime errors
+- ✅ **Architecture Consistency**: Aligned all configuration access with defined structure
+
+### 🎯 **Impact Assessment**
+- **System Reliability**: Configuration issues no longer prevent successful transcriptions
+- **Developer Experience**: Module execution with `python -m vttiro` provides standard Python workflow
+- **Production Readiness**: Proper configuration validation ensures deployment stability
+- **User Experience**: Clear error resolution enables successful transcription operations
