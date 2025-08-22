@@ -1,5 +1,12 @@
 ## vttiro Changelog
 
+## [v1.0.4 - RADICAL TRIMDOWN: From Enterprise Monster to Focused Tool] - 2025-08-22
+*   **MASSIVE BLOAT ELIMINATION:** Deleted 15,495+ lines of over-engineered enterprise complexity, reducing codebase to 5,411 lines in 25 focused files (74% reduction from bloated state).
+*   **DELETED ENTERPRISE MODULES:** Removed 6 entire over-engineered systems: resilience framework (circuit breakers, enterprise retry patterns), quality analyzer (accessibility scoring), multi-format exporter (SRT/TTML complexity), security theater (unnecessary API encryption), configuration schema (complex validation), internal test duplication.
+*   **CORE SIMPLIFICATION:** Simplified transcriber from 501 to 205 lines (60% reduction), input validation from 1,063 to 132 lines (87% reduction), removed 20+ bloat utility modules, eliminated type validation decorators and complex sanitization patterns.
+*   **FOCUSED ARCHITECTURE:** Clean three-step workflow: Audio Prep (video extraction, chunking) → AI Transcription (Gemini/OpenAI/AssemblyAI/Deepgram) → WebVTT Generation (LLM post-processing). All core functionality preserved without enterprise bloat.
+*   **MAINTAINABLE CODEBASE:** Working CLI, all provider imports functional, simple retry logic with exponential backoff, basic validation only, removed security theater for local transcription tool.
+
 ## [v2.1.42 - MAJOR v2.0 Codebase Cleanup Completed] - 2025-08-22
 *   **Massive Code Reduction:** Successfully removed 123,420 lines of code (85% reduction from 145,274 to 21,854 lines) while preserving all core transcription functionality.
 *   **Backwards Compatibility Elimination:** Completely removed migration utilities (`migration.py`, `cli_compatibility.py`, `legacy.py`), deprecated CLI flags, legacy testing infrastructure, and all migration-related code (~2,200+ lines).
