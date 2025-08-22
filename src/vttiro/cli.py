@@ -23,6 +23,7 @@ from vttiro import __version__
 from vttiro.core.config import VttiroConfig
 from vttiro.core.transcriber import Transcriber
 from vttiro.utils.input_validation import InputValidator
+from vttiro.utils.api_keys import get_all_available_api_keys
 
 console = Console()
 
@@ -217,6 +218,26 @@ class VttiroCLI:
             "\n".join(provider_info),
             title="🤖 Available Engines and Models"
         ))
+
+    def apikeys(self) -> None:
+        """Show available API keys for debugging configuration issues."""
+        try:
+            api_keys = get_all_available_api_keys()
+            key_info = []
+            for provider, status in api_keys.items():
+                if status == "Not found":
+                    key_info.append(f"❌ {provider.upper()}: {status}")
+                else:
+                    key_info.append(f"✅ {provider.upper()}: {status}")
+            
+            console.print(Panel(
+                "\n".join(key_info),
+                title="🔑 API Key Status",
+                subtitle="Use environment variables like VTTIRO_GEMINI_API_KEY, GEMINI_API_KEY, etc.",
+                border_style="green"
+            ))
+        except Exception as e:
+            console.print(f"[red]Error checking API keys: {e}[/red]")
 
     def _resolve_prompt_parameters(
         self,

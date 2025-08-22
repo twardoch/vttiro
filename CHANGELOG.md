@@ -1,5 +1,12 @@
 ## vttiro Changelog
 
+## [v1.0.7 - API Key Management & Development Workflow Enhancement] - 2025-08-22
+*   **Robust API Key Management:** Implemented comprehensive API key fallback system supporting multiple environment variable patterns (VTTIRO_{PROVIDER}_API_KEY, {PROVIDER}_API_KEY, GOOGLE_API_KEY, DG_API_KEY, AAI_API_KEY)
+*   **Developer Experience:** Added comprehensive development loop documentation to CLAUDE.md with testing protocols, error diagnosis, configuration setup, and troubleshooting guides
+*   **CLI Debugging Tools:** Added `vttiro apikeys` command for debugging API key configuration issues, showing status of all provider keys
+*   **Provider Reliability:** Updated all transcription providers (Gemini, OpenAI, Deepgram, AssemblyAI) to use fallback API key resolution with improved error messages
+*   **Code Quality:** Completed infrastructure cleanup tasks - removed development bloat, consolidated configuration management to pyproject.toml single source
+
 ## [v1.0.6 - Hatch Build System Migration] - 2025-08-22
 *   **Build System Modernization:** Migrated to hatch and hatch-vcs for automatic semantic versioning based on git tags and commits
 *   **Automatic Version Management:** `__version__.py` now generated automatically from git history (no longer tracked in version control)
