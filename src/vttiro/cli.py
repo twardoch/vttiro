@@ -121,6 +121,7 @@ class VttiroCLI:
         self.config.prompt = effective_prompt_config.get('prompt')
         self.config.verbose = verbose
         self.config.dry_run = dry_run
+        self.config.debug = verbose  # Use verbose as debug flag
 
         if output_path:
             self.config.output_path = Path(output_path)
@@ -152,7 +153,7 @@ class VttiroCLI:
             
             import asyncio
             result = asyncio.run(transcriber.transcribe(
-                audio_path=input_path_obj,
+                media_path=input_path_obj,
                 output_path=Path(output_path) if output_path else None,
                 **kwargs
             ))

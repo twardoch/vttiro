@@ -47,20 +47,20 @@ class Transcriber:
     
     async def transcribe(
         self, 
-        audio_path: Path,
+        media_path: Path,
         output_path: Optional[Path] = None,
         **kwargs: Any
     ) -> TranscriptionResult:
-        """Transcribe audio file to text with timing.
+        """Transcribe video/audio file to text with timing.
         
-        Simple transcription method:
-        1. Validate input file exists
-        2. Select provider 
-        3. Transcribe with basic retry
+        Complete transcription pipeline:
+        1. Extract audio from video (if needed) and chunk if large
+        2. Transcribe each audio chunk separately
+        3. Combine results with timestamp adjustment
         4. Generate VTT output if requested
         
         Args:
-            audio_path: Path to input audio/video file
+            media_path: Path to input video or audio file
             output_path: Optional output path for VTT file
             **kwargs: Additional parameters for transcription
             
@@ -74,29 +74,67 @@ class Transcriber:
         start_time = time.time()
         
         # Basic validation
-        if not audio_path.exists():
-            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+        if not media_path.exists():
+            raise FileNotFoundError(f"Media file not found: {media_path}")
         
         provider = self.config.engine or self.config.provider or "gemini"
-        logger.info(f"Transcribing {audio_path} using {provider}")
+        logger.info(f"Transcribing {media_path} using {provider}")
         
+        # Initialize audio processor
+        from ..processing import create_audio_processor
+        audio_processor = create_audio_processor(debug=getattr(self.config, 'debug', False))
+        
+        work_dir = None
         try:
-            # Perform transcription with simple retry
-            result = await self._transcribe_with_retry(audio_path, provider, **kwargs)
+            # Process media file (extract audio, chunk if needed)
+            audio_chunks, work_dir = audio_processor.process_media_file(media_path, output_path)
+            logger.info(f"Processing {len(audio_chunks)} audio chunks")
+            
+            # Transcribe all chunks
+            chunk_results = []
+            total_offset = 0.0
+            
+            for i, chunk_path in enumerate(audio_chunks):
+                logger.info(f"Transcribing chunk {i+1}/{len(audio_chunks)}: {chunk_path.name}")
+                
+                # Transcribe individual chunk
+                chunk_result = await self._transcribe_chunk(chunk_path, provider, **kwargs)
+                
+                # Adjust timestamps by adding offset
+                adjusted_segments = []
+                for segment in chunk_result.segments:
+                    adjusted_segment = TranscriptSegment(
+                        start=segment.start + total_offset,
+                        end=segment.end + total_offset,
+                        text=segment.text,
+                        confidence=segment.confidence,
+                        speaker=segment.speaker
+                    )
+                    adjusted_segments.append(adjusted_segment)
+                
+                chunk_results.append((adjusted_segments, chunk_result.metadata))
+                
+                # Update offset for next chunk (get duration from last segment)
+                if adjusted_segments:
+                    total_offset = adjusted_segments[-1].end
+            
+            # Combine all results
+            combined_result = self._combine_chunk_results(chunk_results, provider, media_path)
             
             # Generate VTT output if requested
             if output_path:
-                await self._generate_vtt(result, output_path)
+                await self._generate_vtt(combined_result, output_path)
             
-            # Add basic metadata
+            # Add final metadata
             duration = time.time() - start_time
-            result.metadata.update({
+            combined_result.metadata.update({
                 "transcription_duration": duration,
                 "provider": provider,
-                "audio_path": str(audio_path)
+                "media_path": str(media_path),
+                "chunks_processed": len(audio_chunks)
             })
             
-            return result
+            return combined_result
             
         except Exception as e:
             if isinstance(e, VttiroError):
@@ -106,19 +144,18 @@ class Transcriber:
             error = TranscriptionError(
                 f"Transcription failed with {provider}: {str(e)}",
                 provider=provider,
-                details={"audio_path": str(audio_path), "error": str(e)}
+                details={"media_path": str(media_path), "error": str(e)}
             )
             raise error
-    
-    async def _transcribe_with_retry(
-        self, 
-        audio_path: Path, 
-        provider: str, 
-        max_retries: int = 3,
-        **kwargs
-    ) -> TranscriptionResult:
-        """Transcribe with simple exponential backoff retry."""
         
+        finally:
+            # Cleanup working directory unless debug mode
+            if work_dir:
+                audio_processor.cleanup_working_directory(work_dir)
+    
+    async def _transcribe_chunk(self, audio_path: Path, provider: str, **kwargs) -> TranscriptionResult:
+        """Transcribe a single audio chunk with retry logic."""
+        max_retries = 3
         last_error = None
         
         for attempt in range(max_retries):
@@ -129,12 +166,49 @@ class Transcriber:
                 last_error = e
                 if attempt < max_retries - 1:
                     delay = 2 ** attempt  # Simple exponential backoff
-                    logger.warning(f"Transcription attempt {attempt + 1} failed, retrying in {delay}s: {e}")
+                    logger.warning(f"Chunk transcription attempt {attempt + 1} failed, retrying in {delay}s: {e}")
                     await asyncio.sleep(delay)
                 else:
-                    logger.error(f"All {max_retries} transcription attempts failed")
+                    logger.error(f"All {max_retries} attempts failed for chunk: {audio_path.name}")
         
-        raise last_error or TranscriptionError(f"Transcription failed after {max_retries} attempts")
+        raise last_error or TranscriptionError(f"Chunk transcription failed after {max_retries} attempts")
+    
+    def _combine_chunk_results(self, chunk_results: list, provider: str, media_path: Path) -> TranscriptionResult:
+        """Combine transcription results from multiple chunks."""
+        all_segments = []
+        combined_metadata = {
+            "provider": provider,
+            "media_path": str(media_path),
+            "chunks": len(chunk_results)
+        }
+        
+        # Combine all segments from all chunks
+        for segments, metadata in chunk_results:
+            all_segments.extend(segments)
+            
+            # Merge metadata (keep first chunk's metadata as base)
+            if not combined_metadata.get("language") and metadata.get("language"):
+                combined_metadata["language"] = metadata["language"]
+            if not combined_metadata.get("confidence") and metadata.get("confidence"):
+                combined_metadata["confidence"] = metadata["confidence"]
+        
+        # Calculate overall confidence
+        if all_segments:
+            confidences = [seg.confidence for seg in all_segments if seg.confidence is not None]
+            if confidences:
+                combined_metadata["confidence"] = sum(confidences) / len(confidences)
+        
+        # Create combined result
+        result = TranscriptionResult(
+            segments=all_segments,
+            metadata=combined_metadata,
+            provider=provider,
+            language=combined_metadata.get("language"),
+            confidence=combined_metadata.get("confidence", 0.0)
+        )
+        
+        logger.info(f"Combined {len(all_segments)} segments from {len(chunk_results)} chunks")
+        return result
     
     async def _call_provider(self, audio_path: Path, provider: str, **kwargs) -> TranscriptionResult:
         """Call the specified transcription provider."""

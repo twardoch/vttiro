@@ -157,6 +157,11 @@ class VttiroConfig(BaseModel):
         description="Enable verbose logging and debug output"
     )
     
+    debug: bool = Field(
+        default=False,
+        description="Enable debug mode (preserve working directories)"
+    )
+    
     dry_run: bool = Field(
         default=False,
         description="Validate configuration and estimate costs without transcribing"
