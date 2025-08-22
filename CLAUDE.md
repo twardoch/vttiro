@@ -325,6 +325,9 @@
     
     <list>
       <item>Ask before extending/refactoring existing code that may add complexity or break things</item>
+      <item>When you’re facing issues and you’re trying to fix it, don’t create mock or fake solutions “just to make it work”. Think hard to figure out the real reason and nature of the issue. Consult tools for best ways to resolve it.</item>
+      <item>When you’re fixing and improving, try to find the SIMPLEST solution. Strive for elegance. Simplify when you can. Avoid adding complexity. </item>
+      <item>Do not add "enterprise features" unless explicitly requested. Remember: SIMPLICITY is more important. Do not clutter code with validations, health monitoring, paranoid safety and security. This is decidedly out of scope. </item>
       <item>Work tirelessly without constant updates when in continuous work mode</item>
       <item>Only notify when you've completed all <code inline="true">PLAN.md</code> and <code inline="true">TODO.md</code> items</item>
     </list>

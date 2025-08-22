@@ -107,27 +107,11 @@ class VttiroCLI:
         # Validate output path if specified
         if output_path:
             output_path_obj = Path(output_path)
-            output_result = validator.validate_output_path(output_path_obj)
-            if not output_result.is_valid:
-                console.print(f"[red]❌ Output path validation failed: {output_result.error_message}[/red]")
-                if output_result.suggestions:
-                    console.print(f"[yellow]💡 Suggestions: {', '.join(output_result.suggestions)}[/yellow]")
+            if not validator.validate_output_path(output_path_obj):
+                console.print(f"[red]❌ Output path validation failed: {output_path_obj}[/red]")
                 return
 
-        # Provider-specific sanitization
-        inputs_dict = {"file_path": input_path_obj, "language": language, **kwargs}
-        is_valid, sanitized_inputs, warnings = provider_sanitizer.sanitize_for_provider(engine, inputs_dict)
-
-        if not is_valid:
-            console.print("[red]❌ Provider-specific validation failed[/red]")
-            return
-
-        if warnings:
-            for warning in warnings:
-                console.print(f"[yellow]⚠️ {warning}[/yellow]")
-
-        # Use sanitized inputs
-        sanitized_kwargs = {k: v for k, v in sanitized_inputs.items() if k not in ["file_path", "language"]}
+        # All validation passed, proceed with transcription
 
         # Update configuration with validated CLI parameters
         self.config.engine = engine
@@ -161,9 +145,28 @@ class VttiroCLI:
             console.print("[blue]Dry run mode - no actual transcription performed[/blue]")
             return
 
-        # TODO: Implement actual transcription logic in Phase 4
-        console.print("[red]Transcription not yet implemented in v2.0[/red]")
-        console.print("[dim]Please use the existing src_old version for now[/dim]")
+        # Perform transcription using simplified transcriber
+        try:
+            transcriber = Transcriber(self.config)
+            console.print(f"Starting transcription of: [cyan]{input_path}[/cyan]")
+            
+            import asyncio
+            result = asyncio.run(transcriber.transcribe(
+                audio_path=input_path_obj,
+                output_path=Path(output_path) if output_path else None,
+                **kwargs
+            ))
+            
+            console.print(f"[green]✓ Transcription completed![/green]")
+            console.print(f"Segments: {len(result.segments)}")
+            if output_path:
+                console.print(f"Output: [cyan]{output_path}[/cyan]")
+                
+        except Exception as e:
+            console.print(f"[red]❌ Transcription failed: {e}[/red]")
+            if verbose:
+                import traceback
+                console.print(traceback.format_exc())
 
     def version(self) -> None:
         """Display version information."""
