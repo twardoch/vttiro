@@ -1,9 +1,10 @@
 # this_file: src/vttiro/utils/__init__.py
 """Essential utility functions for VTTiro transcription.
 
-This module provides core utilities including:
-- Timestamp and prompt utilities for transcription processing
-- Input validation and debugging support
+This module provides core utilities:
+- Timestamp utilities for WebVTT processing
+- Prompt utilities for AI providers  
+- Basic input validation
 """
 
 from .timestamp import (
@@ -19,16 +20,7 @@ from .prompt import (
     validate_prompt_length,
     extract_context_from_metadata
 )
-from .input_validation import (
-    InputValidator,
-    ProviderInputSanitizer,
-    ValidationResult,
-    get_validator,
-    get_provider_sanitizer
-)
-from .debugging import (
-    capture_error
-)
+from .input_validation import InputValidator
 
 __all__ = [
     # Timestamp utilities
@@ -44,10 +36,4 @@ __all__ = [
     'extract_context_from_metadata',
     # Validation utilities
     'InputValidator',
-    'ProviderInputSanitizer',
-    'ValidationResult',
-    'get_validator',
-    'get_provider_sanitizer',
-    # Debugging utilities
-    'capture_error'
 ]

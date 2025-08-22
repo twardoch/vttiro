@@ -200,7 +200,7 @@ def build_plain_text_prompt(
         Prompt string for plain text transcription
     """
     prompt_parts = [
-        "TRANSCRIPTION TASK: Perform "clean verbatim" ("intelligent verbatim") transcription of the provided audio into plain text format.",
+        "TRANSCRIPTION TASK: Perform 'clean verbatim' ('intelligent verbatim') transcription of the provided audio into plain text format.",
         "",
         "TEXT QUALITY REQUIREMENTS:",
         "- Transcribe what is spoken",
