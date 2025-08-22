@@ -26,7 +26,7 @@ from ...core.errors import (
 from ...core.types import TranscriptionResult, TranscriptSegment
 from ...utils.prompt import build_webvtt_prompt, optimize_prompt_for_provider
 from ...utils.timestamp import parse_webvtt_timestamp_line, distribute_words_over_duration
-from ...utils.type_validation import type_validated, validate_audio_path, validate_language_code
+# Removed complex type validation
 from ..base import TranscriberABC
 
 try:
@@ -110,7 +110,7 @@ class OpenAITranscriber(TranscriberABC):
             "fa", "ps", "sw", "ha", "yo", "ig", "zu", "af", "am", "rw"
         ]
     
-    @type_validated
+    
     async def transcribe(
         self,
         audio_path: Path,
@@ -383,7 +383,7 @@ class OpenAITranscriber(TranscriberABC):
             logger.warning(f"Failed to estimate confidence: {e}")
             return 0.90
     
-    @type_validated
+    
     def estimate_cost(self, duration_seconds: float) -> float:
         """Estimate OpenAI Whisper transcription cost in USD.
         

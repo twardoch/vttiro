@@ -22,7 +22,7 @@ from rich.panel import Panel
 from vttiro import __version__
 from vttiro.core.config import VttiroConfig
 from vttiro.core.transcriber import Transcriber
-from vttiro.utils.input_validation import InputValidator, ProviderInputSanitizer
+from vttiro.utils.input_validation import InputValidator
 
 console = Console()
 
@@ -84,37 +84,25 @@ class VttiroCLI:
         # Handle prompt configuration
         effective_prompt_config = self._resolve_prompt_parameters(full_prompt, prompt)
 
-        # Early validation of CLI inputs
+        # Simple validation of CLI inputs
         validator = InputValidator()
-        provider_sanitizer = ProviderInputSanitizer(validator)
-
-        # Validate and sanitize inputs early
         input_path_obj = Path(input_path)
 
         # Validate file path
-        file_result = validator.validate_file_path(input_path_obj, engine)
-        if not file_result.is_valid:
-            console.print(f"[red]❌ File validation failed: {file_result.error_message}[/red]")
-            if file_result.suggestions:
-                console.print(f"[yellow]💡 Suggestions: {', '.join(file_result.suggestions)}[/yellow]")
+        if not validator.validate_file_path(input_path_obj, engine):
+            console.print(f"[red]❌ File validation failed for: {input_path_obj}[/red]")
             return
 
-        # Validate engine (provider validation works for engines too)
-        engine_result = validator.validate_provider_name(engine)
-        if not engine_result.is_valid:
-            console.print(f"[red]❌ Engine validation failed: {engine_result.error_message}[/red]")
-            if engine_result.suggestions:
-                console.print(f"[yellow]💡 Suggestions: {', '.join(engine_result.suggestions)}[/yellow]")
+        # Validate engine
+        if not validator.validate_provider_name(engine):
+            console.print(f"[red]❌ Unsupported engine: {engine}[/red]")
+            console.print(f"[yellow]Supported: {', '.join(['gemini', 'openai', 'assemblyai', 'deepgram'])}[/yellow]")
             return
 
         # Validate language if specified
-        if language:
-            lang_result = validator.validate_language_code(language)
-            if not lang_result.is_valid:
-                console.print(f"[red]❌ Language validation failed: {lang_result.error_message}[/red]")
-                if lang_result.suggestions:
-                    console.print(f"[yellow]💡 Suggestions: {', '.join(lang_result.suggestions)}[/yellow]")
-                return
+        if language and not validator.validate_language_code(language):
+            console.print(f"[red]❌ Unsupported language: {language}[/red]")
+            return
 
         # Validate output path if specified
         if output_path:

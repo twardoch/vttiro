@@ -28,7 +28,7 @@ from ...core.errors import (
 from ...core.types import TranscriptionResult, TranscriptSegment
 from ...utils.prompt import build_webvtt_prompt, optimize_prompt_for_provider
 from ...utils.timestamp import parse_webvtt_timestamp_line, distribute_words_over_duration
-from ...utils.type_validation import type_validated, validate_audio_path, validate_language_code
+# Removed complex type validation - using simple validation in base class
 from ..base import TranscriberABC
 
 try:
@@ -191,7 +191,6 @@ class GeminiTranscriber(TranscriberABC):
         
         return safety_settings
     
-    @type_validated
     async def transcribe(
         self,
         audio_path: Path,
@@ -281,7 +280,6 @@ class GeminiTranscriber(TranscriberABC):
             else:
                 raise handle_provider_exception(e, "gemini")
     
-    @type_validated
     def estimate_cost(self, duration_seconds: float) -> float:
         """Estimate Gemini transcription cost in USD.
         

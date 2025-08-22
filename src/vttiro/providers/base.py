@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from ..core.types import TranscriptionResult
-from ..utils.input_validation import InputValidator, ProviderInputSanitizer
+from ..utils.input_validation import InputValidator
 
 
 class TranscriberABC(ABC):
@@ -163,15 +163,6 @@ class TranscriberABC(ABC):
         """
         validator = InputValidator()
         
-        # Use comprehensive file validation
-        file_result = validator.validate_file_path(audio_path, self.provider_name)
-        if not file_result.is_valid:
-            raise ValueError(f"File validation failed: {file_result.error_message}")
-        
-        # Provider-specific validation with size limits
-        provider_sanitizer = ProviderInputSanitizer(validator)
-        inputs_dict = {"file_path": audio_path}
-        is_valid, sanitized_inputs, warnings = provider_sanitizer.sanitize_for_provider(self.provider_name, inputs_dict)
-        
-        if not is_valid:
-            raise ValueError("Provider-specific validation failed")
+        # Simple file validation
+        if not validator.validate_file_path(audio_path, self.provider_name):
+            raise ValueError(f"File validation failed for: {audio_path}")

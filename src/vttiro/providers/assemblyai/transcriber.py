@@ -26,7 +26,7 @@ from ...core.errors import (
 from ...core.types import TranscriptionResult, TranscriptSegment
 from ...utils.prompt import build_webvtt_prompt, optimize_prompt_for_provider
 from ...utils.timestamp import distribute_words_over_duration
-from ...utils.type_validation import type_validated, validate_audio_path, validate_language_code
+# Removed complex type validation
 from ..base import TranscriberABC
 
 try:
@@ -115,7 +115,7 @@ class AssemblyAITranscriber(TranscriberABC):
             "sl", "et", "sq", "bs", "hr", "sr", "me", "af", "sw", "zu"
         ]
     
-    @type_validated
+    
     async def transcribe(
         self,
         audio_path: Path,
@@ -445,7 +445,7 @@ class AssemblyAITranscriber(TranscriberABC):
             logger.warning(f"Failed to estimate confidence: {e}")
             return 0.90
     
-    @type_validated
+    
     def estimate_cost(self, duration_seconds: float) -> float:
         """Estimate AssemblyAI transcription cost in USD.
         
