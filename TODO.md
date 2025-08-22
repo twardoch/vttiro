@@ -8,39 +8,38 @@
 
 - [x] Actually MAKE THIS WORK see @issues/402.txt ✅ (API key fallback system implemented)
 
-
-
----
-
-## 🎯 NEXT PHASE: 3 SMALL-SCALE QUALITY IMPROVEMENTS
-
-
-#### Task 2: Remove Development Infrastructure Bloat ✅ COMPLETED
-**Goal**: Clean up unnecessary development scripts and configurations
-**Status**: No scripts/ directory exists - task was already completed
-
-#### Task 3: Consolidate Configuration Management ✅ COMPLETED
-**Goal**: Standardize project configuration to single source
-**Status**: All pytest configuration already consolidated in pyproject.toml - no standalone config files exist
+- [x] Remove validation and profile bloat from codebase ✅ (v1.0.9 - Validation & Profile Bloat Removal completed)
 
 ---
 
-## 🔄 LOWER PRIORITY REMAINING TASKS
+## 🎯 QUALITY IMPROVEMENT PHASE: 3 SMALL-SCALE RELIABILITY TASKS
 
-### Phase 3: Optional Cleanup (Priority: LOW)
+Based on analysis of the current streamlined codebase, these specific improvements will increase quality, reliability & robustness:
 
-#### Dependencies Cleanup
-- [ ] **Remove Unused Dependencies** from pyproject.toml
-- [ ] **Simplify Optional Dependencies** groups  
-- [ ] **Update Requirements** to minimal set
+### Task 1: Code Quality & Import Cleanup
+**Goal**: Fix linting errors, organize imports, remove unused code from validation cleanup
+**Focus Areas**:
+- Fix unused imports and broken test code leftover from validation removal
+- Convert relative imports to absolute imports (TID252 violations)
+- Remove unused variables and clean up test assertions
+- Organize imports properly at module top level
 
-#### External Dependencies  
-- [ ] **Remove External Repository Integration** (`external/repos/`) - if exists
-  - Use proper pip dependencies instead
-  - Remove local repository copies
+### Task 2: Exception Handling Improvements  
+**Goal**: Improve exception handling patterns for better debugging and reliability
+**Focus Areas**:
+- Remove f-strings from exception constructors (EM102 violations)
+- Add proper exception chaining with `raise ... from err` (B904 violations)
+- Convert string literals in exceptions to variables (EM101 violations)
+- Ensure consistent error handling patterns across providers
 
-#### Documentation Updates
-- [ ] **Update Documentation** to reflect simplified architecture
-- [ ] **Standardize Logging** - loguru only, remove standard logging fallbacks
+### Task 3: Constants & Magic Values Cleanup
+**Goal**: Replace magic numbers with named constants for maintainability
+**Focus Areas**:
+- Replace magic values like `300`, `1024` with named constants (PLR2004 violations)
+- Create constants module for commonly used values (timeouts, size limits, etc.)
+- Document the meaning and rationale for key numeric values
+- Improve code readability and make values configurable
+
+**All tasks focus on core functionality reliability without adding bloat or complexity.**
 
 

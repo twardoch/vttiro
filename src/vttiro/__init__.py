@@ -9,12 +9,7 @@ optimized processing, and comprehensive format support.
 __version__ = "2.0.0-dev"
 
 # Core exports for backwards compatibility and public API
-from .core.types import TranscriptionResult, TranscriptSegment
-from .core.transcriber import Transcriber
+from vttiro.core.transcriber import Transcriber
+from vttiro.core.types import TranscriptionResult, TranscriptSegment
 
-__all__ = [
-    "TranscriptionResult", 
-    "TranscriptSegment", 
-    "Transcriber",
-    "__version__"
-]
+__all__ = ["Transcriber", "TranscriptSegment", "TranscriptionResult", "__version__"]

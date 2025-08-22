@@ -6,7 +6,7 @@ transcription models, with support for various output formats and
 context-aware optimizations.
 
 Used by:
-- Provider implementations for generating API prompts  
+- Provider implementations for generating API prompts
 - Core orchestration for prompt customization
 - Testing infrastructure for prompt validation
 """
@@ -146,7 +146,7 @@ def build_webvtt_prompt(
             "00:00:01.000 --> 00:00:05.000",
             "Hello and welcome to today's presentation.",
             "",
-            "00:00:05.500 --> 00:00:10.250", 
+            "00:00:05.500 --> 00:00:10.250",
             "<v Speaker 2>Thank you for having me here.",
             "",
             "00:00:10.500 --> 00:00:15.750",
@@ -332,12 +332,11 @@ def validate_prompt_length(prompt: str, max_tokens: int = 4000) -> tuple[bool, s
 
     if estimated_tokens <= max_tokens:
         return True, f"Prompt length OK ({estimated_tokens} estimated tokens)"
-    else:
-        excess = estimated_tokens - max_tokens
-        return (
-            False,
-            f"Prompt too long ({estimated_tokens} tokens, {excess} over limit)",
-        )
+    excess = estimated_tokens - max_tokens
+    return (
+        False,
+        f"Prompt too long ({estimated_tokens} tokens, {excess} over limit)",
+    )
 
 
 def extract_context_from_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -362,7 +361,7 @@ def extract_context_from_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
 
     for context_key, possible_keys in context_fields.items():
         for key in possible_keys:
-            if key in metadata and metadata[key]:
+            if metadata.get(key):
                 context[context_key] = metadata[key]
                 break
 

@@ -1,5 +1,19 @@
 ## vttiro Changelog
 
+## [v1.0.9 - Validation & Profile Bloat Removal] - 2025-08-22
+*   **Massive Validation Simplification:** Stripped `input_validation.py` from 357 lines to 18 lines (95% reduction), removing InputValidator class, complex format detection, provider compatibility matrices, processing estimates, and over-engineered validation theater
+*   **Configuration Debloating:** Removed all profile management methods from `config.py` including `from_profile()`, `to_profile()`, `create_default_profiles()`, project config discovery, environment validation, and complex prompt validation - eliminated 400+ lines of unnecessary complexity
+*   **Pydantic Validation Removal:** Removed all `@field_validator` decorators and complex validation logic from VttiroConfig, focusing on essential functionality over paranoid validation
+*   **Import Cleanup:** Updated all modules to use simple `validate_file_path()` function instead of complex InputValidator class, fixed broken imports across codebase and tests
+*   **Philosophy:** Embraced simplicity over enterprise security theater - validation now does the absolute minimum needed (file exists, is readable) without complex analysis, compatibility checking, or processing estimates
+
+## [v1.0.8 - Production-Ready Quality Enhancements] - 2025-08-22
+*   **Enhanced Error Handling:** Completely rebuilt `errors.py` from 19 to 230 lines (1,111% increase) with comprehensive error hierarchy, error codes, and actionable user guidance for debugging
+*   **Robust Input Validation:** Enhanced `input_validation.py` from 14 to 384 lines (2,643% increase) with comprehensive format detection, provider compatibility matrix, file integrity checking, and processing time estimates
+*   **Memory Management & Performance:** Upgraded `audio.py` from 22 to 450 lines (1,945% increase) with MemoryManager for system monitoring, ProgressTracker with ETA calculations, streaming audio processing, and optimized cleanup strategies
+*   **Integration & API Compatibility:** Fixed cross-module integration issues, added missing factory functions, aligned API signatures, and ensured seamless interaction between enhanced modules
+*   **Production Readiness:** All three quality improvement tasks completed, resulting in robust error resilience, comprehensive input validation, and memory-optimized performance for large files
+
 ## [v1.0.7 - API Key Management & Development Workflow Enhancement] - 2025-08-22
 *   **Robust API Key Management:** Implemented comprehensive API key fallback system supporting multiple environment variable patterns (VTTIRO_{PROVIDER}_API_KEY, {PROVIDER}_API_KEY, GOOGLE_API_KEY, DG_API_KEY, AAI_API_KEY)
 *   **Developer Experience:** Added comprehensive development loop documentation to CLAUDE.md with testing protocols, error diagnosis, configuration setup, and troubleshooting guides

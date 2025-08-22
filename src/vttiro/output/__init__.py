@@ -5,7 +5,7 @@ This module provides WebVTT subtitle generation without over-engineered
 quality analysis or multi-format complexity.
 """
 
-from .enhanced_webvtt import EnhancedWebVTTFormatter, WebVTTConfig
+from vttiro.output.enhanced_webvtt import EnhancedWebVTTFormatter, WebVTTConfig
 
 __all__ = [
     "EnhancedWebVTTFormatter",

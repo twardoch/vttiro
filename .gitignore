@@ -308,3 +308,4 @@ VERSION.txt
 wheels/
 x64/
 x86/
+.mypy_cache/

@@ -8,6 +8,7 @@
     
     <cp caption="After Making Changes - Testing Protocol">
       <list>
+        <item><b>QUICK FUNCTIONAL TEST:</b> <code inline="true">bash temp/test1.sh</code> - Real transcription test with ONE model</item>
         <item><b>Quick Validation:</b> <code inline="true">uv run vttiro version</code> - Verify package loads correctly</item>
         <item><b>Format & Lint:</b> <code inline="true">fd -e py -x uvx ruff format --respect-gitignore {}; fd -e py -x uvx ruff check --fix {}</code></item>
         <item><b>Type Check:</b> <code inline="true">uvx mypy src/vttiro --ignore-missing-imports</code></item>

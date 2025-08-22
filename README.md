@@ -18,11 +18,17 @@
 ### Installation
 
 ```bash
-# Basic installation (API-only transcription)
+# Core installation (includes CLI and configuration)
 uv pip install vttiro
+
+# Essential transcription (includes all AI providers)
+uv pip install vttiro[basic]
 
 # With local inference capabilities
 uv pip install vttiro[local]
+
+# YouTube download integration
+uv pip install vttiro[youtube]
 
 # Complete installation with all features
 uv pip install vttiro[all]

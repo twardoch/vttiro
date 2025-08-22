@@ -2,15 +2,17 @@
 # this_file: tests/conftest.py
 """Shared test fixtures and configuration for vttiro test suite."""
 
-import pytest
 import asyncio
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+from unittest.mock import AsyncMock, MagicMock
 
-from vttiro.core.config import VttiroConfig, TranscriptionResult
+import pytest
+
+from vttiro.core.config import VttiroConfig
+from vttiro.core.types import TranscriptionResult
 
 
 @pytest.fixture(scope="session")
@@ -33,7 +35,7 @@ def temp_dir():
 def mock_config():
     """Create a mock VttiroConfig for testing."""
     config = MagicMock(spec=VttiroConfig)
-    
+
     # Mock transcription settings
     config.transcription = MagicMock()
     config.transcription.preferred_model = "auto"
@@ -43,19 +45,19 @@ def mock_config():
     config.transcription.max_duration_seconds = 3600
     config.transcription.chunk_duration_seconds = 30
     config.transcription.language = "auto"
-    
+
     # Mock processing settings
     config.processing = MagicMock()
     config.processing.max_workers = 4
     config.processing.memory_limit_mb = 2048
     config.processing.temp_dir = "/tmp/vttiro"
-    
+
     # Mock output settings
     config.output = MagicMock()
     config.output.format = "webvtt"
     config.output.include_metadata = True
     config.output.include_timestamps = True
-    
+
     return config
 
 
@@ -71,11 +73,7 @@ def mock_transcription_result():
         word_timestamps=[],
         speaker_labels=[],
         emotions=[],
-        metadata={
-            "model": "test_model",
-            "processing_time": 1.5,
-            "correlation_id": "test-123"
-        }
+        metadata={"model": "test_model", "processing_time": 1.5, "correlation_id": "test-123"},
     )
 
 
@@ -92,7 +90,7 @@ def mock_video_metadata():
         upload_date="2024-01-01",
         view_count=1000,
         like_count=50,
-        tags=["test", "video", "transcription"]
+        tags=["test", "video", "transcription"],
     )
 
 
@@ -115,14 +113,14 @@ def mock_audio_chunks():
 def mock_video_processor():
     """Create a mock VideoProcessor for testing."""
     processor = AsyncMock()
-    
+
     # Mock successful processing result
     result = MagicMock()
     result.metadata = MagicMock()
     result.metadata.title = "Test Video"
     result.metadata.duration_seconds = 120.0
     result.segments = []
-    
+
     processor.process_source.return_value = result
     return processor
 
@@ -134,19 +132,15 @@ def mock_transcription_engine():
     engine.name = "test_engine"
     engine.model_name = "test-model-v1"
     engine.supported_languages = ["en", "es", "fr", "de"]
-    
+
     # Mock successful transcription
     engine.transcribe.return_value = TranscriptionResult(
-        text="Test transcription result",
-        confidence=0.9,
-        language="en",
-        start_time=0.0,
-        end_time=5.0
+        text="Test transcription result", confidence=0.9, language="en", start_time=0.0, end_time=5.0
     )
-    
+
     engine.get_supported_languages.return_value = ["en", "es", "fr", "de"]
     engine.estimate_cost.return_value = 0.01
-    
+
     return engine
 
 
@@ -154,16 +148,12 @@ def mock_transcription_engine():
 def mock_transcription_ensemble():
     """Create a mock TranscriptionEnsemble for testing."""
     ensemble = AsyncMock()
-    
+
     # Mock successful transcription
     ensemble.transcribe.return_value = TranscriptionResult(
-        text="Ensemble transcription result",
-        confidence=0.95,
-        language="en",
-        start_time=0.0,
-        end_time=5.0
+        text="Ensemble transcription result", confidence=0.95, language="en", start_time=0.0, end_time=5.0
     )
-    
+
     ensemble.estimate_cost.return_value = 0.015
     return ensemble
 
@@ -210,8 +200,8 @@ def api_key_config():
     """Create configuration with mock API keys for testing."""
     return {
         "gemini_api_key": "test_gemini_key_123",
-        "assemblyai_api_key": "test_assemblyai_key_456", 
-        "deepgram_api_key": "test_deepgram_key_789"
+        "assemblyai_api_key": "test_assemblyai_key_456",
+        "deepgram_api_key": "test_deepgram_key_789",
     }
 
 
@@ -220,24 +210,8 @@ def mock_network_responses():
     """Create mock network responses for API testing."""
     return {
         "gemini": {
-            "success": {
-                "candidates": [
-                    {
-                        "content": {
-                            "parts": [
-                                {"text": "Test transcription from Gemini"}
-                            ]
-                        }
-                    }
-                ]
-            },
-            "error": {
-                "error": {
-                    "code": 429,
-                    "message": "Rate limit exceeded",
-                    "status": "RESOURCE_EXHAUSTED"
-                }
-            }
+            "success": {"candidates": [{"content": {"parts": [{"text": "Test transcription from Gemini"}]}}]},
+            "error": {"error": {"code": 429, "message": "Rate limit exceeded", "status": "RESOURCE_EXHAUSTED"}},
         },
         "assemblyai": {
             "success": {
@@ -245,32 +219,20 @@ def mock_network_responses():
                 "status": "completed",
                 "text": "Test transcription from AssemblyAI",
                 "confidence": 0.92,
-                "words": []
+                "words": [],
             },
-            "error": {
-                "error": "Insufficient funds"
-            }
+            "error": {"error": "Insufficient funds"},
         },
         "deepgram": {
             "success": {
                 "results": {
                     "channels": [
-                        {
-                            "alternatives": [
-                                {
-                                    "transcript": "Test transcription from Deepgram",
-                                    "confidence": 0.88
-                                }
-                            ]
-                        }
+                        {"alternatives": [{"transcript": "Test transcription from Deepgram", "confidence": 0.88}]}
                     ]
                 }
             },
-            "error": {
-                "err_code": "INVALID_AUTH",
-                "err_msg": "Invalid authentication"
-            }
-        }
+            "error": {"err_code": "INVALID_AUTH", "err_msg": "Invalid authentication"},
+        },
     }
 
 
@@ -281,25 +243,24 @@ def setup_test_environment(monkeypatch, temp_dir):
     monkeypatch.setenv("VTTIRO_TEST_MODE", "true")
     monkeypatch.setenv("VTTIRO_TEMP_DIR", str(temp_dir))
     monkeypatch.setenv("VTTIRO_LOG_LEVEL", "DEBUG")
-    
+
     # Ensure clean state for each test
-    yield
-    
+
     # Cleanup is handled by temp_dir fixture
 
 
 class MockAPIResponse:
     """Mock API response for testing network operations."""
-    
-    def __init__(self, json_data: Dict[str, Any], status_code: int = 200):
+
+    def __init__(self, json_data: dict[str, Any], status_code: int = 200):
         self.json_data = json_data
         self.status_code = status_code
         self.text = str(json_data)
         self.headers = {"Content-Type": "application/json"}
-    
+
     def json(self):
         return self.json_data
-    
+
     def raise_for_status(self):
         if self.status_code >= 400:
             raise Exception(f"HTTP {self.status_code}")
@@ -314,17 +275,17 @@ def mock_api_response_factory():
 # Performance testing utilities
 class PerformanceCollector:
     """Collect performance metrics during tests."""
-    
+
     def __init__(self):
         self.metrics = {}
-    
+
     def record(self, name: str, value: float, unit: str = "seconds"):
         """Record a performance metric."""
         if name not in self.metrics:
             self.metrics[name] = []
         self.metrics[name].append({"value": value, "unit": unit})
-    
-    def get_average(self, name: str) -> Optional[float]:
+
+    def get_average(self, name: str) -> float | None:
         """Get average value for a metric."""
         if name not in self.metrics:
             return None
@@ -344,12 +305,12 @@ def generate_test_transcription_results(count: int = 5) -> list:
     results = []
     for i in range(count):
         result = TranscriptionResult(
-            text=f"Test transcription segment {i+1}",
+            text=f"Test transcription segment {i + 1}",
             confidence=0.8 + (i * 0.02),  # Varying confidence
             language="en",
             start_time=i * 30.0,
             end_time=(i + 1) * 30.0,
-            metadata={"segment_id": i+1}
+            metadata={"segment_id": i + 1},
         )
         results.append(result)
     return results
@@ -362,5 +323,5 @@ def generate_test_error_scenarios():
         {"type": "api", "message": "Rate limit exceeded"},
         {"type": "auth", "message": "Invalid API key"},
         {"type": "processing", "message": "Unsupported file format"},
-        {"type": "validation", "message": "Invalid input parameters"}
+        {"type": "validation", "message": "Invalid input parameters"},
     ]

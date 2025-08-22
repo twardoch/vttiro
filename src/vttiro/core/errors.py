@@ -12,621 +12,223 @@ Used by:
 - Testing infrastructure for error validation
 """
 
-from typing import Any
+from pathlib import Path
+from typing import Any, Optional
 
 # Import version for dynamic version reporting
 try:
-    from .. import __version__
+    from vttiro import __version__
+
+    VTTIRO_VERSION = __version__
 except ImportError:
-    __version__: str = "unknown"
+    VTTIRO_VERSION = "unknown"
 
 
 class VttiroError(Exception):
-    """Base exception for all VTTiro-specific errors.
-    
-    Provides common structure for error handling and logging.
-    All VTTiro exceptions should inherit from this class.
-    """
-    
-    def __init__(self, message: str, details: dict[str, Any] | None = None):
-        """Initialize error with message and optional details.
-        
-        Args:
-            message: Human-readable error message
-            details: Optional dictionary with additional error context
-        """
-        super().__init__(message)
+    """Base exception for all VTTiro errors."""
+
+    def __init__(
+        self, message: str, error_code: str = "UNKNOWN", details: dict | None = None, guidance: str | None = None
+    ):
         self.message = message
+        self.error_code = error_code
         self.details = details or {}
-    
-    def __str__(self) -> str:
-        """Return formatted error message."""
-        if self.details:
-            details_str = ", ".join(f"{k}={v}" for k, v in self.details.items())
-            return f"{self.message} (details: {details_str})"
-        return self.message
+        self.guidance = guidance
+        super().__init__(self._format_message())
+
+    def _format_message(self) -> str:
+        """Format error message with code and guidance."""
+        formatted = f"[{self.error_code}] {self.message}"
+        if self.guidance:
+            formatted += f"\n💡 {self.guidance}"
+        return formatted
 
 
-class ConfigurationError(VttiroError):
-    """Raised when configuration is invalid or incomplete.
-    
-    Examples:
-    - Missing API keys
-    - Invalid provider settings
-    - Conflicting configuration options
-    """
-    pass
+class AuthenticationError(VttiroError):
+    """Error related to API authentication."""
 
+    def __init__(self, message: str, provider: str | None = None, details: dict | None = None):
+        error_code = f"AUTH_ERROR_{provider.upper()}" if provider else "AUTH_ERROR"
 
-class ProviderError(VttiroError):
-    """Base class for provider-specific errors.
-    
-    Used for errors that occur during interaction with transcription
-    providers (API failures, authentication issues, etc.).
-    """
-    
-    def __init__(
-        self, 
-        message: str, 
-        provider: str,
-        details: dict[str, Any] | None = None
-    ):
-        """Initialize provider error.
-        
-        Args:
-            message: Error message
-            provider: Provider name (e.g., "gemini", "openai")
-            details: Additional error context
-        """
-        super().__init__(message, details)
-        self.provider = provider
+        # Provider-specific guidance
+        guidance_map = {
+            "gemini": "Set VTTIRO_GEMINI_API_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY environment variable",
+            "openai": "Set VTTIRO_OPENAI_API_KEY or OPENAI_API_KEY environment variable",
+            "deepgram": "Set VTTIRO_DEEPGRAM_API_KEY, DEEPGRAM_API_KEY, or DG_API_KEY environment variable",
+            "assemblyai": "Set VTTIRO_ASSEMBLYAI_API_KEY, ASSEMBLYAI_API_KEY, or AAI_API_KEY environment variable",
+        }
 
-
-class APIError(ProviderError):
-    """Raised when external API calls fail.
-    
-    Examples:
-    - Network timeouts
-    - HTTP error responses
-    - Rate limiting
-    """
-    
-    def __init__(
-        self,
-        message: str,
-        provider: str,
-        status_code: int | None = None,
-        response_text: str | None = None,
-        details: dict[str, Any] | None = None
-    ):
-        """Initialize API error.
-        
-        Args:
-            message: Error message
-            provider: Provider name
-            status_code: HTTP status code if applicable
-            response_text: Response body if available
-            details: Additional error context
-        """
-        details = details or {}
-        if status_code is not None:
-            details["status_code"] = status_code
-        if response_text is not None:
-            details["response_text"] = response_text[:500]  # Truncate long responses
-            
-        super().__init__(message, provider, details)
-        self.status_code = status_code
-        self.response_text = response_text
-
-
-class AuthenticationError(ProviderError):
-    """Raised when authentication with provider fails.
-    
-    Examples:
-    - Invalid API keys
-    - Expired tokens
-    - Insufficient permissions
-    """
-    pass
-
-
-class QuotaExceededError(ProviderError):
-    """Raised when provider quota/rate limits are exceeded.
-    
-    Examples:
-    - Monthly usage limits reached
-    - Rate limiting in effect
-    - Billing issues
-    """
-    
-    def __init__(
-        self,
-        message: str,
-        provider: str,
-        retry_after: int | None = None,
-        details: dict[str, Any] | None = None
-    ):
-        """Initialize quota error.
-        
-        Args:
-            message: Error message
-            provider: Provider name
-            retry_after: Seconds until retry is allowed
-            details: Additional error context
-        """
-        details = details or {}
-        if retry_after is not None:
-            details["retry_after"] = retry_after
-            
-        super().__init__(message, provider, details)
-        self.retry_after = retry_after
-
-
-class ContentFilterError(ProviderError):
-    """Raised when content is blocked by safety filters.
-    
-    Examples:
-    - Gemini safety filter blocking
-    - Content policy violations
-    - Potentially harmful content detected
-    """
-    
-    def __init__(
-        self,
-        message: str,
-        provider: str,
-        blocked_categories: list[str] | None = None,
-        details: dict[str, Any] | None = None
-    ):
-        """Initialize content filter error.
-        
-        Args:
-            message: Error message
-            provider: Provider name
-            blocked_categories: List of blocked content categories
-            details: Additional error context
-        """
-        details = details or {}
-        if blocked_categories:
-            details["blocked_categories"] = blocked_categories
-            
-        super().__init__(message, provider, details)
-        self.blocked_categories = blocked_categories or []
+        guidance = guidance_map.get(provider, "Check API key configuration. Use 'vttiro apikeys' to debug.")
+        super().__init__(message, error_code, details, guidance)
 
 
 class ProcessingError(VttiroError):
-    """Raised when audio/video processing fails.
-    
-    Examples:
-    - File format not supported
-    - Corrupted media files
-    - Preprocessing failures
-    """
-    
+    """Error during file processing or transcription."""
+
+    def __init__(
+        self, message: str, file_path: str | None = None, stage: str = "processing", details: dict | None = None
+    ):
+        self.file_path = file_path
+        self.stage = stage
+        error_code = f"PROCESSING_{stage.upper()}"
+
+        # Stage-specific guidance
+        guidance_map = {
+            "audio_extraction": "Ensure FFmpeg is installed: 'brew install ffmpeg' (macOS) or 'apt install ffmpeg' (Ubuntu)",
+            "chunking": "Try reducing max_segment_duration parameter or use smaller input files",
+            "transcription": "Check network connection and API key validity",
+            "output_generation": "Ensure output directory is writable",
+        }
+
+        guidance = guidance_map.get(stage, "Check file format compatibility and try again")
+        if file_path:
+            details = details or {}
+            details["file_path"] = file_path
+
+        super().__init__(message, error_code, details, guidance)
+
+
+class APIError(VttiroError):
+    """Error from external API calls."""
+
+    def __init__(self, message: str, provider: str, status_code: int | None = None, details: dict | None = None):
+        self.provider = provider
+        self.status_code = status_code
+        error_code = f"API_{provider.upper()}_{status_code}" if status_code else f"API_{provider.upper()}"
+
+        # Status code specific guidance
+        guidance_map = {
+            400: "Check request parameters and file format compatibility",
+            401: "Verify API key is valid and has sufficient permissions",
+            403: "API key lacks required permissions or quota exceeded",
+            404: "API endpoint not found - check provider configuration",
+            429: "Rate limit exceeded - wait before retrying",
+            500: "Provider server error - try again later",
+            503: "Provider service unavailable - try different provider or wait",
+        }
+
+        guidance = guidance_map.get(status_code, f"Check {provider} API status and try again")
+        super().__init__(message, error_code, details, guidance)
+
+
+class ContentFilterError(VttiroError):
+    """Error when content is filtered by AI provider."""
+
+    def __init__(self, message: str, provider: str, details: dict | None = None):
+        self.provider = provider
+        error_code = f"CONTENT_FILTERED_{provider.upper()}"
+        
+        guidance = f"Content was rejected by {provider} safety filters. Try rephrasing input or use different provider."
+        super().__init__(message, error_code, details, guidance)
+
+
+class FileFormatError(VttiroError):
+    """Error related to unsupported or invalid file formats."""
+
     def __init__(
         self,
         message: str,
         file_path: str | None = None,
-        details: dict[str, Any] | None = None
+        format_type: str | None = None,
+        details: dict | None = None,
     ):
-        """Initialize processing error.
-        
-        Args:
-            message: Error message
-            file_path: Path to problematic file
-            details: Additional error context
-        """
-        details = details or {}
-        if file_path:
-            details["file_path"] = file_path
-            
-        super().__init__(message, details)
         self.file_path = file_path
+        self.format_type = format_type
+        error_code = f"FORMAT_{format_type.upper()}" if format_type else "FORMAT_UNSUPPORTED"
+
+        guidance = "Supported formats: MP4, AVI, MOV, MKV, WebM, MP3, WAV, M4A, FLAC. Convert using FFmpeg if needed."
+        if file_path:
+            details = details or {}
+            details["file_path"] = file_path
+
+        super().__init__(message, error_code, details, guidance)
+
+
+class ValidationError(VttiroError):
+    """Error from input validation."""
+
+    def __init__(self, message: str, field: str | None = None, value: Any | None = None, details: dict | None = None):
+        self.field = field
+        self.value = value
+        error_code = f"VALIDATION_{field.upper()}" if field else "VALIDATION_ERROR"
+
+        guidance = "Check input parameters and configuration. Use --help for valid options."
+        super().__init__(message, error_code, details, guidance)
 
 
 class TranscriptionError(VttiroError):
-    """Raised when transcription process fails.
-    
-    Examples:
-    - Empty or invalid responses
-    - Parsing failures
-    - Quality issues
-    """
-    
-    def __init__(
-        self,
-        message: str,
-        provider: str | None = None,
-        details: dict[str, Any] | None = None
-    ):
-        """Initialize transcription error.
-        
-        Args:
-            message: Error message
-            provider: Provider name if applicable
-            details: Additional error context
-        """
-        details = details or {}
-        if provider:
-            details["provider"] = provider
-            
-        super().__init__(message, details)
-        self.provider = provider
+    """Error during the transcription process."""
+
+    def __init__(self, message: str, attempts: int = 0, max_retries: int = 3, details: dict | None = None):
+        self.attempts = attempts
+        self.max_retries = max_retries
+        error_code = "TRANSCRIPTION_FAILED"
+
+        guidance = f"Transcription failed after {attempts}/{max_retries} attempts. Try different provider or check network connectivity."
+        super().__init__(message, error_code, details, guidance)
 
 
-class OutputError(VttiroError):
-    """Raised when output generation fails.
-    
-    Examples:
-    - File write permissions
-    - Invalid output formats
-    - Template rendering issues
-    """
-    pass
+def handle_provider_exception(exc: Exception, provider: str, context: dict | None = None) -> VttiroError:
+    """Convert provider-specific exceptions to VttiroError with guidance.
 
-
-class RateLimitError(ProviderError):
-    """Raised when provider rate limits are exceeded.
-    
-    Examples:
-    - Too many requests per second
-    - Burst rate limits exceeded
-    - Temporary throttling
-    """
-    
-    def __init__(
-        self,
-        message: str,
-        provider: str,
-        retry_after: int | None = None,
-        details: dict[str, Any] | None = None
-    ):
-        """Initialize rate limit error with optional retry timing.
-        
-        Args:
-            message: Error description
-            provider: Provider name
-            retry_after: Seconds to wait before retrying (if known)
-            details: Additional error context
-        """
-        details = details or {}
-        if retry_after is not None:
-            details["retry_after"] = retry_after
-            
-        super().__init__(message, provider, details)
-        self.retry_after = retry_after
-
-
-class ProviderUnavailableError(ProviderError):
-    """Raised when a provider service is temporarily unavailable.
-    
-    Examples:
-    - Service maintenance
-    - Temporary outages
-    - Regional availability issues
-    """
-    pass
-
-
-class TimeoutError(VttiroError):
-    """Raised when operations exceed configured timeout limits.
-    
-    Examples:
-    - Network request timeouts
-    - Processing timeouts
-    - Provider response timeouts
-    """
-    
-    def __init__(
-        self,
-        message: str,
-        timeout_duration: float | None = None,
-        details: dict[str, Any] | None = None
-    ):
-        """Initialize timeout error with duration info.
-        
-        Args:
-            message: Error description
-            timeout_duration: Duration that was exceeded (if known)
-            details: Additional error context
-        """
-        details = details or {}
-        if timeout_duration is not None:
-            details["timeout_duration"] = timeout_duration
-            
-        super().__init__(message, details)
-        self.timeout_duration = timeout_duration
-
-
-def handle_provider_exception(exc: Exception, provider: str) -> VttiroError:
-    """Convert generic exceptions to typed VTTiro errors.
-    
     Args:
-        exc: Original exception
-        provider: Provider name
-        
+        exc: Original exception from provider
+        provider: Provider name (gemini, openai, etc.)
+        context: Additional context for error handling
+
     Returns:
-        Appropriate VttiroError subclass
+        VttiroError with appropriate error code and guidance
     """
-    # Convert common exceptions to typed errors
-    if isinstance(exc, FileNotFoundError):
-        return ProcessingError(
-            f"Audio file not found: {exc}",
-            details={"original_error": str(exc)}
+    context = context or {}
+    exc_str = str(exc).lower()
+
+    # Authentication errors
+    if any(keyword in exc_str for keyword in ["api key", "authentication", "unauthorized", "invalid key"]):
+        return AuthenticationError(
+            f"{provider.title()} authentication failed: {exc}", provider=provider, details=context
         )
-    
-    elif isinstance(exc, PermissionError):
-        return ProcessingError(
-            f"Permission denied: {exc}",
-            details={"original_error": str(exc)}
+
+    # Rate limiting errors
+    if any(keyword in exc_str for keyword in ["rate limit", "quota", "too many requests"]):
+        return APIError(
+            f"{provider.title()} rate limit exceeded: {exc}", provider=provider, status_code=429, details=context
         )
-    
-    elif isinstance(exc, ValueError):
-        if "api key" in str(exc).lower() or "authentication" in str(exc).lower():
-            return AuthenticationError(
-                f"Authentication failed for {provider}: {exc}",
-                provider=provider,
-                details={"original_error": str(exc)}
-            )
-        else:
-            return TranscriptionError(
-                f"Invalid data or parameters: {exc}",
-                provider=provider,
-                details={"original_error": str(exc)}
-            )
-    
-    elif hasattr(exc, 'status_code'):
-        # HTTP-like errors
-        status_code = getattr(exc, 'status_code', None)
-        
-        if status_code == 401:
-            return AuthenticationError(
-                f"Authentication failed for {provider}",
-                provider=provider,
-                details={"status_code": status_code, "original_error": str(exc)}
-            )
-        elif status_code == 429:
-            return QuotaExceededError(
-                f"Rate limit exceeded for {provider}",
-                provider=provider,
-                details={"status_code": status_code, "original_error": str(exc)}
-            )
-        elif status_code and status_code >= 400:
-            return APIError(
-                f"API error from {provider}",
-                provider=provider,
-                status_code=status_code,
-                details={"original_error": str(exc)}
-            )
-    
-    # Fallback to generic provider error
-    return ProviderError(
-        f"Unexpected error from {provider}: {exc}",
-        provider=provider,
-        details={"original_error": str(exc), "exception_type": type(exc).__name__}
+
+    # Network/connectivity errors
+    if any(keyword in exc_str for keyword in ["network", "connection", "timeout", "dns"]):
+        return APIError(f"Network error with {provider.title()}: {exc}", provider=provider, details=context)
+
+    # File format errors
+    if any(keyword in exc_str for keyword in ["format", "codec", "unsupported", "invalid file"]):
+        return FileFormatError(f"File format error: {exc}", file_path=context.get("file_path"), details=context)
+
+    # Generic processing error
+    return ProcessingError(
+        f"{provider.title()} processing error: {exc}", file_path=context.get("file_path"), details=context
     )
 
 
-def suggest_solutions(error: VttiroError) -> list[str]:
-    """Provide helpful suggestions for resolving errors.
-    
+def create_debug_context(file_path: str | None = None, **kwargs) -> dict[str, Any]:
+    """Create debug context for error reporting.
+
     Args:
-        error: VTTiro error instance
-        
-    Returns:
-        List of suggested solutions
-    """
-    suggestions = []
-    
-    if isinstance(error, AuthenticationError):
-        provider = getattr(error, 'provider', 'unknown')
-        env_var_map = {
-            'gemini': 'GEMINI_API_KEY',
-            'openai': 'OPENAI_API_KEY', 
-            'assemblyai': 'ASSEMBLYAI_API_KEY',
-            'deepgram': 'DEEPGRAM_API_KEY'
-        }
-        env_var = env_var_map.get(provider, f'{provider.upper()}_API_KEY')
-        
-        suggestions.extend([
-            f"Set your {provider} API key: export {env_var}=your_key_here",
-            f"Verify the API key is correct (not expired/revoked)",
-            f"Check your {provider} account dashboard for key status",
-            f"Ensure your {provider} account has sufficient credits/quota"
-        ])
-        
-        if provider in env_var_map:
-            suggestions.append(f"Get API key from: {_get_provider_url(provider)}")
-    
-    elif isinstance(error, QuotaExceededError):
-        provider = getattr(error, 'provider', 'unknown')
-        suggestions.extend([
-            f"Check your {provider} usage dashboard for current limits",
-            f"Wait for quota reset (typically hourly/daily/monthly)",
-            f"Upgrade your {provider} plan for higher limits",
-            f"Use smaller audio files or shorter segments",
-            f"Configure VTTiro to use a different provider as fallback"
-        ])
-        
-        if error.retry_after:
-            suggestions.append(f"API suggests retrying after {error.retry_after} seconds")
-    
-    elif isinstance(error, ContentFilterError):
-        provider = getattr(error, 'provider', 'unknown')
-        categories = getattr(error, 'blocked_categories', [])
-        
-        suggestions.extend([
-            f"Audio content blocked by {provider} safety filters",
-            f"Try a different provider (OpenAI/AssemblyAI have different policies)",
-            f"Review audio for sensitive content (hate speech, violence, etc.)",
-            f"Consider pre-processing audio to remove problematic sections"
-        ])
-        
-        if categories:
-            suggestions.append(f"Blocked categories: {', '.join(categories)}")
-        
-        if provider == 'gemini':
-            suggestions.append("Gemini has strict safety filters; try OpenAI for sensitive content")
-    
-    elif isinstance(error, ProcessingError):
-        file_path = getattr(error, 'file_path', None)
-        suggestions.extend([
-            "Verify audio file exists and is readable",
-            "Check file format is supported: WAV, MP3, M4A, FLAC, OGG",
-            "Try converting to WAV format: ffmpeg -i input.mp3 output.wav",
-            "Ensure file size is under provider limits (typically 25MB-200MB)",
-            "Check file is not corrupted by playing it in media player"
-        ])
-        
-        if file_path:
-            suggestions.append(f"Problematic file: {file_path}")
-            # Add file-specific suggestions based on extension
-            if file_path.endswith(('.mp4', '.mov', '.avi')):
-                suggestions.append("For video files, extract audio first: ffmpeg -i video.mp4 -vn audio.wav")
-    
-    elif isinstance(error, APIError):
-        provider = getattr(error, 'provider', 'unknown')
-        status_code = getattr(error, 'status_code', None)
-        
-        suggestions.extend([
-            "Check your internet connection stability",
-            f"Verify {provider} service status at {_get_status_url(provider)}",
-            "Try again in a few minutes (temporary service issues)",
-            "Use exponential backoff for retries",
-            "Configure a different provider as backup"
-        ])
-        
-        if status_code:
-            if status_code == 503:
-                suggestions.append("Service temporarily unavailable - try again shortly")
-            elif status_code == 502:
-                suggestions.append("Gateway error - provider may be experiencing issues")
-            elif status_code >= 500:
-                suggestions.append("Server error on provider side - not your fault")
-    
-    elif isinstance(error, ConfigurationError):
-        suggestions.extend([
-            "Check your VTTiro configuration file syntax",
-            "Verify all required fields are provided",
-            "Ensure provider names are spelled correctly",
-            "Review configuration documentation for valid options"
-        ])
-    
-    # Add general debugging suggestions
-    suggestions.extend([
-        "Enable verbose logging for more details: set LOG_LEVEL=DEBUG",
-        "Check VTTiro documentation: https://github.com/twardoch/vttiro",
-        "Report persistent issues on GitHub with error details"
-    ])
-    
-    return suggestions
-
-
-def _get_provider_url(provider: str) -> str:
-    """Get provider signup/API key URL."""
-    urls = {
-        'gemini': 'https://aistudio.google.com/app/apikey',
-        'openai': 'https://platform.openai.com/api-keys',
-        'assemblyai': 'https://www.assemblyai.com/app/account',
-        'deepgram': 'https://console.deepgram.com/project/_/keys'
-    }
-    return urls.get(provider, f'https://{provider}.com')
-
-
-def _get_status_url(provider: str) -> str:
-    """Get provider status page URL."""
-    status_urls = {
-        'gemini': 'https://status.cloud.google.com/',
-        'openai': 'https://status.openai.com/',
-        'assemblyai': 'https://status.assemblyai.com/',
-        'deepgram': 'https://status.deepgram.com/'
-    }
-    return status_urls.get(provider, f'https://status.{provider}.com')
-
-
-def format_error_for_user(error: VttiroError, include_suggestions: bool = True) -> str:
-    """Format error message for end-user display.
-    
-    Args:
-        error: VTTiro error instance
-        include_suggestions: Whether to include solution suggestions
-        
-    Returns:
-        Formatted error message with context and suggestions
-    """
-    lines = [f"❌ {error.message}"]
-    
-    # Add error details if available
-    if error.details:
-        important_details = {k: v for k, v in error.details.items() 
-                           if k not in ['original_error', 'exception_type']}
-        if important_details:
-            lines.append(f"   Details: {', '.join(f'{k}={v}' for k, v in important_details.items())}")
-    
-    # Add suggestions
-    if include_suggestions:
-        suggestions = suggest_solutions(error)
-        if suggestions:
-            lines.append("\n💡 Suggestions:")
-            for i, suggestion in enumerate(suggestions[:5], 1):  # Limit to 5 suggestions
-                lines.append(f"   {i}. {suggestion}")
-            
-            if len(suggestions) > 5:
-                lines.append(f"   ... and {len(suggestions) - 5} more suggestions")
-    
-    return '\n'.join(lines)
-
-
-def create_debug_context(
-    operation: str,
-    provider: str | None = None,
-    file_path: str | None = None,
-    **kwargs
-) -> dict[str, Any]:
-    """Create debugging context for error reporting.
-    
-    Args:
-        operation: Description of operation being performed
-        provider: Provider name if applicable
-        file_path: File being processed if applicable
+        file_path: Path to file being processed
         **kwargs: Additional context information
-        
+
     Returns:
-        Dictionary with debugging context
+        Context dictionary with debug information
     """
-    import os
-    import time
-    from pathlib import Path
-    
     context = {
-        'operation': operation,
-        'timestamp': time.time(),
-        'vttiro_version': __version__,
+        "vttiro_version": VTTIRO_VERSION,
+        "timestamp": __import__("datetime").datetime.now().isoformat(),
+        **kwargs,
     }
-    
-    if provider:
-        context['provider'] = provider
-        # Add provider-specific debugging info
-        env_vars = {
-            'gemini': 'GEMINI_API_KEY',
-            'openai': 'OPENAI_API_KEY',
-            'assemblyai': 'ASSEMBLYAI_API_KEY', 
-            'deepgram': 'DEEPGRAM_API_KEY'
-        }
-        if provider in env_vars:
-            key_set = env_vars[provider] in os.environ
-            context[f'{provider}_api_key_set'] = key_set
-    
+
     if file_path:
         path = Path(file_path)
-        context.update({
-            'file_path': str(path),
-            'file_exists': path.exists(),
-            'file_size': path.stat().st_size if path.exists() else None,
-            'file_suffix': path.suffix.lower()
-        })
-    
-    # Add any additional context
-    context.update(kwargs)
-    
+        if path.exists():
+            context.update(
+                {"file_path": str(path), "file_size": path.stat().st_size, "file_extension": path.suffix.lower()}
+            )
+
     return context

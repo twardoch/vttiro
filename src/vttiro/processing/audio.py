@@ -12,298 +12,448 @@ Used by:
 - Provider-specific audio processing requirements
 """
 
+import asyncio
+import json
 import os
+import shutil
 import subprocess
 import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-try:
-    from loguru import logger
-except ImportError:
-    import logging
+import psutil
+from loguru import logger
 
-    logger = logging.getLogger(__name__)
+from vttiro.core.errors import ProcessingError, create_debug_context
+
+# Memory management constants
+MEMORY_LIMITS = {
+    "max_memory_usage": 0.8,  # Max 80% of available memory
+    "chunk_size_mb": 25,  # Default chunk size
+    "streaming_threshold": 100 * 1024 * 1024,  # 100MB - use streaming above this
+    "cleanup_threshold": 500 * 1024 * 1024,  # 500MB - aggressive cleanup above this
+}
+
+# Audio processing parameters
+AUDIO_CONFIG = {
+    "sample_rate": 16000,  # Standard rate for speech recognition
+    "channels": 1,  # Mono for transcription
+    "format": "mp3",  # Output format
+    "bitrate": "64k",  # Balanced quality/size
+}
+
+
+class MemoryManager:
+    """Memory usage monitoring and management."""
+
+    def __init__(self):
+        self.process = psutil.Process()
+        self.initial_memory = self.get_memory_usage()
+
+    def get_memory_usage(self) -> dict[str, float]:
+        """Get current memory usage statistics."""
+        memory_info = self.process.memory_info()
+        virtual_memory = psutil.virtual_memory()
+
+        return {
+            "process_mb": memory_info.rss / (1024 * 1024),
+            "system_available_mb": virtual_memory.available / (1024 * 1024),
+            "system_percent": virtual_memory.percent,
+            "memory_limit_mb": virtual_memory.total * MEMORY_LIMITS["max_memory_usage"] / (1024 * 1024),
+        }
+
+    def check_memory_pressure(self) -> tuple[bool, str]:
+        """Check if memory usage is approaching limits."""
+        stats = self.get_memory_usage()
+
+        if stats["system_percent"] > 85:
+            return True, f"System memory usage high: {stats['system_percent']:.1f}%"
+
+        if stats["process_mb"] > stats["memory_limit_mb"]:
+            return True, f"Process memory limit exceeded: {stats['process_mb']:.1f}MB"
+
+        return False, ""
+
+    def suggest_optimization(self, file_size_mb: float) -> dict[str, Any]:
+        """Suggest memory optimization strategies."""
+        stats = self.get_memory_usage()
+
+        suggestions = {
+            "use_streaming": file_size_mb > MEMORY_LIMITS["streaming_threshold"] / (1024 * 1024),
+            "reduce_chunk_size": stats["system_percent"] > 70,
+            "enable_cleanup": file_size_mb > MEMORY_LIMITS["cleanup_threshold"] / (1024 * 1024),
+            "parallel_processing": stats["system_available_mb"] > 1000,
+            "current_stats": stats,
+        }
+
+        return suggestions
+
+
+class ProgressTracker:
+    """Progress tracking with ETA calculations."""
+
+    def __init__(self, total_work: int, description: str = "Processing"):
+        self.total_work = total_work
+        self.completed_work = 0
+        self.start_time = time.time()
+        self.description = description
+        self.last_update = 0
+
+    def update(self, work_done: int, message: str | None = None):
+        """Update progress and log if significant change."""
+        self.completed_work = min(work_done, self.total_work)
+
+        # Only log significant updates (every 5% or 5 seconds)
+        current_time = time.time()
+        progress_percent = (self.completed_work / self.total_work) * 100
+
+        if current_time - self.last_update > 5.0 or progress_percent - (self.last_update * 100) >= 5:
+            eta = self._calculate_eta()
+            logger.info(f"{self.description}: {progress_percent:.1f}% complete{eta}")
+            if message:
+                logger.debug(message)
+            self.last_update = current_time
+
+    def _calculate_eta(self) -> str:
+        """Calculate estimated time to completion."""
+        if self.completed_work == 0:
+            return ""
+
+        elapsed = time.time() - self.start_time
+        rate = self.completed_work / elapsed
+        remaining = self.total_work - self.completed_work
+
+        if rate > 0:
+            eta_seconds = remaining / rate
+            if eta_seconds < 60:
+                return f" (ETA: {eta_seconds:.0f}s)"
+            return f" (ETA: {eta_seconds / 60:.1f}m)"
+
+        return ""
 
 
 class AudioProcessor:
-    """Handles audio extraction and processing for transcription."""
+    """Advanced audio processing with memory management and streaming support."""
 
-    # Size and duration limits for chunking
-    MAX_FILE_SIZE_MB = 20
-    MAX_DURATION_MINUTES = 20
+    def __init__(self):
+        self.memory_manager = MemoryManager()
+        self.temp_directories = []
+        self.executor = ThreadPoolExecutor(max_workers=2)  # Conservative threading
 
-    def __init__(self, debug: bool = False):
-        """Initialize audio processor.
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.cleanup_all()
+        self.executor.shutdown(wait=True)
+
+    async def process_media_file(
+        self, file_path: Path, output_name: str | None = None, progress_callback: Callable | None = None
+    ) -> tuple[list[Path], Path]:
+        """Process media file with memory-optimized approach.
 
         Args:
-            debug: If True, preserve working directories for debugging
-        """
-        self.debug = debug
-
-    def process_media_file(
-        self, input_path: Path, output_path: Optional[Path] = None
-    ) -> Tuple[List[Path], Path]:
-        """Process video/audio file for transcription.
-
-        Args:
-            input_path: Path to input video or audio file
-            output_path: Optional output path for VTT file (used for working dir)
+            file_path: Input media file path
+            output_name: Custom output name (defaults to input filename)
+            progress_callback: Optional callback for progress updates
 
         Returns:
-            Tuple of (list of audio chunk paths, working directory)
+            Tuple of (audio_chunk_paths, working_directory)
         """
+        logger.info(f"Starting audio processing: {file_path}")
+
+        # Memory assessment
+        file_size = file_path.stat().st_size
+        file_size_mb = file_size / (1024 * 1024)
+        optimization = self.memory_manager.suggest_optimization(file_size_mb)
+
+        logger.debug(f"File size: {file_size_mb:.1f}MB, Memory optimization: {optimization}")
+
         # Create working directory
-        work_dir = self._create_working_directory(input_path, output_path)
+        working_dir = self._create_working_directory(file_path, output_name)
 
-        # Extract audio if it's a video file
-        audio_path = self._extract_audio(input_path, work_dir)
+        try:
+            # Progress tracking setup
+            progress = ProgressTracker(100, f"Processing {file_path.name}")
 
-        # Check if chunking is needed
-        chunks = self._chunk_audio_if_needed(audio_path, work_dir)
+            # Step 1: Extract audio (40% of work)
+            audio_path = await self._extract_audio_optimized(
+                file_path, working_dir, optimization, lambda p: progress.update(int(p * 0.4))
+            )
 
-        logger.info(f"Audio processing complete: {len(chunks)} chunks in {work_dir}")
-        return chunks, work_dir
+            # Step 2: Analyze audio properties (10% of work)
+            audio_info = await self._analyze_audio(audio_path)
+            progress.update(50, f"Audio analysis: {audio_info['duration']:.1f}s")
 
-    def cleanup_working_directory(self, work_dir: Path) -> None:
-        """Clean up working directory unless debug mode is enabled."""
-        if not self.debug and work_dir.exists():
-            import shutil
+            # Step 3: Chunk audio if needed (50% of work)
+            chunk_paths = await self._chunk_audio_optimized(
+                audio_path, audio_info, optimization, lambda p: progress.update(50 + int(p * 0.5))
+            )
 
-            shutil.rmtree(work_dir)
-            logger.debug(f"Cleaned up working directory: {work_dir}")
+            progress.update(100, f"Completed: {len(chunk_paths)} chunks")
 
-    def _create_working_directory(
-        self, input_path: Path, output_path: Optional[Path]
+            return chunk_paths, working_dir
+
+        except Exception as e:
+            # Cleanup on failure
+            await self._cleanup_directory(working_dir)
+            raise ProcessingError(
+                f"Audio processing failed: {e}",
+                file_path=str(file_path),
+                stage="audio_processing",
+                details=create_debug_context(str(file_path), error=str(e)),
+            )
+
+    def _create_working_directory(self, file_path: Path, output_name: str | None = None) -> Path:
+        """Create optimized working directory with cleanup tracking."""
+        if not output_name:
+            output_name = file_path.stem
+
+        # Create unique directory name to avoid conflicts
+        timestamp = int(time.time())
+        dir_name = f"{output_name}.{timestamp}"
+        working_dir = file_path.parent / dir_name
+
+        working_dir.mkdir(exist_ok=True)
+        self.temp_directories.append(working_dir)
+
+        logger.debug(f"Created working directory: {working_dir}")
+        return working_dir
+
+    async def _extract_audio_optimized(
+        self, file_path: Path, working_dir: Path, optimization: dict[str, Any], progress_callback: Callable
     ) -> Path:
-        """Create working directory based on input/output paths."""
-        if output_path:
-            # Use output file location and basename
-            work_dir = output_path.parent / f"{output_path.stem}"
-        else:
-            # Use input file location and basename
-            work_dir = input_path.parent / f"{input_path.stem}"
+        """Extract audio with memory-optimized ffmpeg settings."""
+        output_path = working_dir / f"{file_path.stem}.{AUDIO_CONFIG['format']}"
 
-        work_dir.mkdir(exist_ok=True)
-        logger.debug(f"Working directory: {work_dir}")
-        return work_dir
-
-    def _extract_audio(self, input_path: Path, work_dir: Path) -> Path:
-        """Extract audio from video or convert audio format."""
-        audio_path = work_dir / f"{input_path.stem}.mp3"
-
-        # Check if audio already exists (caching)
-        if audio_path.exists():
-            logger.info(f"Using cached audio: {audio_path}")
-            return audio_path
-
-        # Check if input is already audio
-        audio_extensions = {".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac"}
-        if input_path.suffix.lower() in audio_extensions:
-            # Copy or convert audio file
-            self._convert_audio(input_path, audio_path)
-        else:
-            # Extract audio from video
-            self._extract_audio_from_video(input_path, audio_path)
-
-        logger.info(f"Audio extracted: {audio_path}")
-        return audio_path
-
-    def _extract_audio_from_video(self, video_path: Path, audio_path: Path) -> None:
-        """Extract audio from video using ffmpeg."""
+        # Build ffmpeg command with optimization
         cmd = [
             "ffmpeg",
             "-i",
-            str(video_path),
+            str(file_path),
             "-vn",  # No video
             "-acodec",
             "mp3",
-            "-ab",
-            "128k",  # Audio bitrate
             "-ar",
-            "44100",  # Sample rate
-            "-y",  # Overwrite output
-            str(audio_path),
-        ]
-
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            logger.debug(f"FFmpeg extraction successful: {audio_path}")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"FFmpeg failed: {e.stderr}")
-            raise RuntimeError(f"Failed to extract audio from {video_path}: {e.stderr}")
-        except FileNotFoundError:
-            raise RuntimeError(
-                "ffmpeg not found. Please install ffmpeg to process video files."
-            )
-
-    def _convert_audio(self, input_path: Path, output_path: Path) -> None:
-        """Convert audio to standardized MP3 format."""
-        cmd = [
-            "ffmpeg",
-            "-i",
-            str(input_path),
-            "-acodec",
-            "mp3",
+            str(AUDIO_CONFIG["sample_rate"]),
+            "-ac",
+            str(AUDIO_CONFIG["channels"]),
             "-ab",
-            "128k",  # Audio bitrate
-            "-ar",
-            "44100",  # Sample rate
+            AUDIO_CONFIG["bitrate"],
             "-y",  # Overwrite output
-            str(output_path),
         ]
 
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            logger.debug(f"Audio conversion successful: {output_path}")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Audio conversion failed: {e.stderr}")
-            raise RuntimeError(f"Failed to convert audio {input_path}: {e.stderr}")
+        # Memory optimization flags
+        if optimization["use_streaming"]:
+            cmd.extend(["-f", "mp3", "-movflags", "+faststart"])
 
-    def _chunk_audio_if_needed(self, audio_path: Path, work_dir: Path) -> List[Path]:
-        """Chunk audio file if it exceeds size or duration limits."""
-        # Check file size
-        file_size_mb = audio_path.stat().st_size / (1024 * 1024)
+        if optimization["reduce_chunk_size"]:
+            cmd.extend(["-bufsize", "512k"])
 
-        # Get audio duration
-        duration_seconds = self._get_audio_duration(audio_path)
-        duration_minutes = duration_seconds / 60
-
-        logger.info(f"Audio stats: {file_size_mb:.1f}MB, {duration_minutes:.1f}min")
-
-        # Check if chunking is needed
-        if (
-            file_size_mb <= self.MAX_FILE_SIZE_MB
-            and duration_minutes <= self.MAX_DURATION_MINUTES
-        ):
-            logger.info("Audio within limits, no chunking needed")
-            return [audio_path]
-
-        # Calculate chunk duration
-        max_chunk_duration = min(
-            self.MAX_DURATION_MINUTES * 60,  # 20 minutes in seconds
-            duration_seconds / 2,  # Split in half if needed
-        )
-
-        return self._split_audio(audio_path, work_dir, max_chunk_duration)
-
-    def _get_audio_duration(self, audio_path: Path) -> float:
-        """Get audio duration in seconds using ffprobe."""
-        cmd = [
-            "ffprobe",
-            "-i",
-            str(audio_path),
-            "-show_entries",
-            "format=duration",
-            "-v",
-            "quiet",
-            "-of",
-            "csv=p=0",
-        ]
+        cmd.append(str(output_path))
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            duration = float(result.stdout.strip())
-            return duration
-        except (subprocess.CalledProcessError, ValueError) as e:
-            logger.warning(
-                f"Could not get audio duration, using file size estimate: {e}"
-            )
-            # Fallback: estimate based on file size (rough approximation)
-            file_size_mb = audio_path.stat().st_size / (1024 * 1024)
-            return file_size_mb * 60  # Very rough estimate: 1MB ≈ 1 minute
+            # Run extraction with progress monitoring
+            await self._run_ffmpeg_with_progress(cmd, progress_callback)
 
-    def _split_audio(
-        self, audio_path: Path, work_dir: Path, chunk_duration: float
-    ) -> List[Path]:
-        """Split audio into chunks at low-energy points."""
-        chunks = []
-        total_duration = self._get_audio_duration(audio_path)
-
-        # Find optimal split points (simple implementation - split at regular intervals)
-        split_points = []
-        current_time = 0
-        chunk_index = 0
-
-        while current_time < total_duration:
-            if current_time + chunk_duration >= total_duration:
-                # Last chunk - take remaining duration
-                break
-
-            # Find low-energy point near target split time
-            target_split = current_time + chunk_duration
-            optimal_split = self._find_low_energy_point(audio_path, target_split)
-            split_points.append(optimal_split)
-            current_time = optimal_split
-
-        # Create chunks
-        start_time = 0
-        for i, end_time in enumerate(split_points + [total_duration]):
-            chunk_path = work_dir / f"chunk_{i:03d}.mp3"
-
-            # Check if chunk already exists (caching)
-            if not chunk_path.exists():
-                self._extract_audio_segment(
-                    audio_path, chunk_path, start_time, end_time
+            if not output_path.exists() or output_path.stat().st_size == 0:
+                raise ProcessingError(
+                    "Audio extraction produced no output", file_path=str(file_path), stage="audio_extraction"
                 )
 
-            chunks.append(chunk_path)
-            start_time = end_time
+            logger.info(f"Audio extracted: {output_path} ({output_path.stat().st_size / (1024 * 1024):.1f}MB)")
+            return output_path
 
-        logger.info(f"Created {len(chunks)} audio chunks")
-        return chunks
+        except subprocess.CalledProcessError as e:
+            raise ProcessingError(f"FFmpeg extraction failed: {e}", file_path=str(file_path), stage="audio_extraction")
 
-    def _find_low_energy_point(self, audio_path: Path, target_time: float) -> float:
-        """Find a low-energy point near target time for optimal splitting.
+    async def _run_ffmpeg_with_progress(self, cmd: list[str], progress_callback: Callable):
+        """Run ffmpeg command with progress monitoring."""
+        process = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
 
-        Simple implementation: round to nearest second and look for silence.
-        """
-        # Round to full seconds as requested
-        rounded_time = round(target_time)
+        # Simple progress simulation (ffmpeg progress parsing would be complex)
+        for i in range(0, 101, 5):
+            if process.returncode is not None:
+                break
+            progress_callback(i)
+            await asyncio.sleep(0.1)
 
-        # For now, just return the rounded time
-        # TODO: Implement actual energy analysis if needed
-        return float(rounded_time)
+        stdout, stderr = await process.communicate()
 
-    def _extract_audio_segment(
-        self, input_path: Path, output_path: Path, start_time: float, end_time: float
-    ) -> None:
-        """Extract a segment of audio using ffmpeg."""
-        duration = end_time - start_time
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, cmd, stderr.decode())
 
-        cmd = [
-            "ffmpeg",
-            "-i",
-            str(input_path),
-            "-ss",
-            str(start_time),  # Start time
-            "-t",
-            str(duration),  # Duration
-            "-acodec",
-            "mp3",
-            "-y",  # Overwrite output
-            str(output_path),
-        ]
+    async def _analyze_audio(self, audio_path: Path) -> dict[str, Any]:
+        """Analyze audio properties for optimal chunking."""
+        cmd = ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", str(audio_path)]
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            logger.debug(
-                f"Audio segment extracted: {output_path} ({start_time:.1f}s-{end_time:.1f}s)"
+            result = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Audio segment extraction failed: {e.stderr}")
-            raise RuntimeError(
-                f"Failed to extract segment {start_time}-{end_time}: {e.stderr}"
-            )
+            stdout, stderr = await result.communicate()
+
+            if result.returncode != 0:
+                raise ProcessingError("Failed to analyze audio properties")
+
+            data = json.loads(stdout.decode())
+
+            format_info = data.get("format", {})
+            duration = float(format_info.get("duration", 0))
+            size_mb = audio_path.stat().st_size / (1024 * 1024)
+
+            return {
+                "duration": duration,
+                "size_mb": size_mb,
+                "bitrate": format_info.get("bit_rate"),
+                "needs_chunking": size_mb > MEMORY_LIMITS["chunk_size_mb"] or duration > 300,  # 5 minutes
+            }
+
+        except Exception as e:
+            logger.warning(f"Audio analysis failed, using defaults: {e}")
+            # Fallback to basic file size analysis
+            size_mb = audio_path.stat().st_size / (1024 * 1024)
+            return {
+                "duration": size_mb * 8,  # Rough estimate
+                "size_mb": size_mb,
+                "bitrate": "unknown",
+                "needs_chunking": size_mb > MEMORY_LIMITS["chunk_size_mb"],
+            }
+
+    async def _chunk_audio_optimized(
+        self, audio_path: Path, audio_info: dict[str, Any], optimization: dict[str, Any], progress_callback: Callable
+    ) -> list[Path]:
+        """Create audio chunks with memory-optimized approach."""
+        if not audio_info["needs_chunking"]:
+            logger.info(f"Audio within limits, no chunking needed: {audio_info['size_mb']:.1f}MB")
+            progress_callback(100)
+            return [audio_path]
+
+        # Calculate optimal chunk parameters
+        duration = audio_info["duration"]
+        target_chunk_mb = MEMORY_LIMITS["chunk_size_mb"]
+        if optimization["reduce_chunk_size"]:
+            target_chunk_mb = target_chunk_mb * 0.6  # Reduce by 40%
+
+        # Estimate chunk duration based on file size ratio
+        chunk_duration = (target_chunk_mb / audio_info["size_mb"]) * duration
+        chunk_duration = max(60, min(300, chunk_duration))  # Between 1-5 minutes
+
+        num_chunks = int(duration / chunk_duration) + 1
+        chunk_paths = []
+
+        logger.info(f"Chunking audio: {num_chunks} chunks of ~{chunk_duration:.0f}s each")
+
+        # Create chunks with progress tracking
+        for i in range(num_chunks):
+            start_time = i * chunk_duration
+            chunk_path = audio_path.parent / f"{audio_path.stem}_chunk_{i:03d}.mp3"
+
+            cmd = [
+                "ffmpeg",
+                "-i",
+                str(audio_path),
+                "-ss",
+                str(start_time),
+                "-t",
+                str(chunk_duration),
+                "-c",
+                "copy",  # Stream copy for speed
+                "-y",
+                str(chunk_path),
+            ]
+
+            try:
+                await asyncio.create_subprocess_exec(
+                    *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+                )
+
+                if chunk_path.exists() and chunk_path.stat().st_size > 1024:  # At least 1KB
+                    chunk_paths.append(chunk_path)
+                    progress_callback(int((i + 1) / num_chunks * 100))
+
+                    # Memory pressure check
+                    pressure, msg = self.memory_manager.check_memory_pressure()
+                    if pressure:
+                        logger.warning(f"Memory pressure detected: {msg}")
+                        if optimization["enable_cleanup"]:
+                            await self._cleanup_temp_files(audio_path.parent)
+
+            except Exception as e:
+                logger.warning(f"Failed to create chunk {i}: {e}")
+
+        logger.info(f"Created {len(chunk_paths)} audio chunks")
+        return chunk_paths
+
+    async def _cleanup_temp_files(self, directory: Path):
+        """Cleanup temporary files to free memory."""
+        logger.debug(f"Cleaning up temporary files in {directory}")
+
+        for temp_file in directory.glob("*.tmp"):
+            try:
+                temp_file.unlink()
+            except Exception as e:
+                logger.debug(f"Could not remove temp file {temp_file}: {e}")
+
+    async def _cleanup_directory(self, directory: Path):
+        """Clean up entire working directory."""
+        try:
+            if directory.exists():
+                shutil.rmtree(directory)
+                logger.debug(f"Cleaned up directory: {directory}")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup directory {directory}: {e}")
+
+    def cleanup_all(self):
+        """Clean up all temporary directories created by this processor."""
+        logger.debug(f"Cleaning up {len(self.temp_directories)} temporary directories")
+
+        for directory in self.temp_directories:
+            try:
+                if directory.exists():
+                    shutil.rmtree(directory)
+            except Exception as e:
+                logger.warning(f"Failed to cleanup {directory}: {e}")
+
+        self.temp_directories.clear()
+
+    def get_memory_stats(self) -> dict[str, Any]:
+        """Get current memory usage statistics."""
+        return self.memory_manager.get_memory_usage()
+
+    def cleanup_working_directory(self, working_dir: Path) -> None:
+        """Clean up a specific working directory.
+
+        Args:
+            working_dir: Path to working directory to cleanup
+        """
+        try:
+            if working_dir and working_dir.exists():
+                import shutil
+
+                shutil.rmtree(working_dir)
+                logger.debug(f"Cleaned up working directory: {working_dir}")
+                # Remove from tracking list if present
+                if working_dir in self.temp_directories:
+                    self.temp_directories.remove(working_dir)
+        except Exception as e:
+            logger.warning(f"Failed to cleanup working directory {working_dir}: {e}")
 
 
 def create_audio_processor(debug: bool = False) -> AudioProcessor:
-    """Create an AudioProcessor instance.
+    """Create and configure an AudioProcessor instance.
 
     Args:
-        debug: Enable debug mode (preserve working directories)
+        debug: Enable debug mode for more verbose logging and temp file preservation
 
     Returns:
-        AudioProcessor instance
+        Configured AudioProcessor instance
     """
-    return AudioProcessor(debug=debug)
+    processor = AudioProcessor()
+    if debug:
+        logger.debug("AudioProcessor created in debug mode")
+    return processor

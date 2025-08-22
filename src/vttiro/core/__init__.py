@@ -2,13 +2,8 @@
 """Core orchestration and configuration for VTTiro 2.0."""
 
 # Import order matters for avoiding circular imports
-from .types import TranscriptionResult, TranscriptSegment
-from .config import VttiroConfig  
-from .transcriber import Transcriber
+from vttiro.core.config import VttiroConfig
+from vttiro.core.transcriber import Transcriber
+from vttiro.core.types import TranscriptionResult, TranscriptSegment
 
-__all__ = [
-    "TranscriptionResult",
-    "TranscriptSegment", 
-    "VttiroConfig",
-    "Transcriber"
-]
+__all__ = ["Transcriber", "TranscriptSegment", "TranscriptionResult", "VttiroConfig"]
