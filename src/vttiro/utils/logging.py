@@ -11,13 +11,17 @@ Used by:
 - Processing modules for performance monitoring
 """
 
+import platform
 import sys
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
+import psutil
 from loguru import logger
+
+from vttiro import __version__
 
 
 def setup_logging(verbose: bool = False, debug: bool = False, log_file: Path | None = None) -> None:
@@ -165,11 +169,6 @@ def get_debug_context() -> dict[str, Any]:
     Returns:
         Dictionary with system information for debugging
     """
-    import platform
-
-    import psutil
-
-    from vttiro import __version__
 
     return {
         "vttiro_version": __version__,

@@ -31,7 +31,10 @@ class TestExceptionHierarchy:
         context = {"source": "test", "operation": "unit_test"}
 
         error = VttiroError(
-            message="Test error", error_code="TEST_ERROR", correlation_id=correlation_id, context=context
+            message="Test error",
+            error_code="TEST_ERROR",
+            correlation_id=correlation_id,
+            context=context,
         )
 
         assert str(error) == f"[{correlation_id[:8]}] Test error"
@@ -44,7 +47,9 @@ class TestExceptionHierarchy:
     def test_error_serialization(self):
         """Test error to_dict serialization."""
         error = ConfigurationError(
-            message="Invalid configuration", error_code="CONFIG_INVALID", context={"config_file": "test.yaml"}
+            message="Invalid configuration",
+            error_code="CONFIG_INVALID",
+            context={"config_file": "test.yaml"},
         )
 
         error_dict = error.to_dict()
@@ -74,7 +79,11 @@ class TestExceptionHierarchy:
     def test_rate_limit_error_details(self):
         """Test RateLimitError with rate limiting details."""
         error = RateLimitError(
-            message="Rate limit exceeded", service_name="assemblyai", retry_after=300, current_usage=1000, limit=1000
+            message="Rate limit exceeded",
+            service_name="assemblyai",
+            retry_after=300,
+            current_usage=1000,
+            limit=1000,
         )
 
         assert error.retry_after == 300
@@ -86,17 +95,23 @@ class TestExceptionHierarchy:
 
     def test_model_error_details(self):
         """Test ModelError with model-specific information."""
-        error = ModelError(message="Model inference failed", model_name="gemini-2.0-flash", model_version="1.0")
+        error = ModelError(
+            message="Model inference failed",
+            model_name="gemini-2.5-flash",
+            model_version="1.0",
+        )
 
-        assert error.model_name == "gemini-2.0-flash"
+        assert error.model_name == "gemini-2.5-flash"
         assert error.model_version == "1.0"
-        assert error.context["model_name"] == "gemini-2.0-flash"
+        assert error.context["model_name"] == "gemini-2.5-flash"
         assert error.context["model_version"] == "1.0"
 
     def test_processing_error_details(self):
         """Test ProcessingError with processing details."""
         error = ProcessingError(
-            message="Video processing failed", file_path="/path/to/video.mp4", processing_stage="audio_extraction"
+            message="Video processing failed",
+            file_path="/path/to/video.mp4",
+            processing_stage="audio_extraction",
         )
 
         assert error.file_path == "/path/to/video.mp4"
@@ -108,7 +123,12 @@ class TestExceptionHierarchy:
         """Test error creation utility function."""
         correlation_id = str(uuid.uuid4())
 
-        error = create_error(NetworkError, "Connection failed", correlation_id=correlation_id, service_name="deepgram")
+        error = create_error(
+            NetworkError,
+            "Connection failed",
+            correlation_id=correlation_id,
+            service_name="deepgram",
+        )
 
         assert isinstance(error, NetworkError)
         assert error.message == "Connection failed"
@@ -117,7 +137,11 @@ class TestExceptionHierarchy:
 
     def test_from_error_code_function(self):
         """Test error creation from error code."""
-        error = from_error_code("VTTIRO_VALIDATION", "Input validation failed", context={"field": "language"})
+        error = from_error_code(
+            "VTTIRO_VALIDATION",
+            "Input validation failed",
+            context={"field": "language"},
+        )
 
         assert isinstance(error, ValidationError)
         assert error.message == "Input validation failed"

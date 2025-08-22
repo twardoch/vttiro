@@ -2,10 +2,8 @@
 # this_file: tests/test_config.py
 """Unit tests for vttiro configuration system."""
 
-import os
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -77,7 +75,7 @@ class TestVttiroConfig:
 
         config = VttiroConfig()
 
-        with pytest.raises(ConfigurationError, match="Invalid environment variable"):
+        with pytest.raises(ValidationError, match="Invalid environment variable"):
             config.update_from_env()
 
     def test_config_load_from_file(self, temp_dir):
@@ -110,7 +108,7 @@ output:
 
     def test_config_load_from_file_not_found(self):
         """Test loading configuration from non-existent file."""
-        with pytest.raises(ConfigurationError, match="Configuration file not found"):
+        with pytest.raises(ValidationError, match="Configuration file not found"):
             VttiroConfig.load_from_file("non_existent.yaml")
 
     def test_config_load_from_file_invalid_yaml(self, temp_dir):
@@ -118,7 +116,7 @@ output:
         config_file = temp_dir / "invalid_config.yaml"
         config_file.write_text("invalid: yaml: content: [")
 
-        with pytest.raises(ConfigurationError, match="Failed to parse configuration"):
+        with pytest.raises(ValidationError, match="Failed to parse configuration"):
             VttiroConfig.load_from_file(config_file)
 
     def test_config_save_to_file(self, temp_dir):

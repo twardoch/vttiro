@@ -11,7 +11,10 @@ Used by:
 - Integration testing of CLI interface
 """
 
+import asyncio
 import sys
+import time
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +28,12 @@ from vttiro.core.errors import ValidationError
 from vttiro.core.transcriber import Transcriber
 from vttiro.utils.api_keys import get_all_available_api_keys
 from vttiro.utils.input_validation import validate_file_path
-from vttiro.utils.logging import log_milestone, log_performance, log_system_info, setup_logging
+from vttiro.utils.logging import (
+    log_milestone,
+    log_performance,
+    log_system_info,
+    setup_logging,
+)
 
 console = Console()
 
@@ -172,11 +180,12 @@ class VttiroCLI:
             console.print(f"Using model: [cyan]{model}[/cyan]")
 
         if dry_run:
-            console.print("[blue]Dry run mode - no actual transcription performed[/blue]")
+            console.print(
+                "[blue]Dry run mode - no actual transcription performed[/blue]"
+            )
             return
 
         # Perform transcription with enhanced progress feedback
-        import time
 
         start_time = time.time()
 
@@ -200,7 +209,14 @@ class VttiroCLI:
             log_milestone("transcriber_initialized", {"engine": engine})
 
             # Progress tracking with Rich progress bar
-            from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeRemainingColumn
+            from rich.progress import (
+                BarColumn,
+                Progress,
+                SpinnerColumn,
+                TaskID,
+                TextColumn,
+                TimeRemainingColumn,
+            )
 
             with Progress(
                 SpinnerColumn(),
@@ -217,35 +233,52 @@ class VttiroCLI:
                 # Create main progress task
                 main_task = progress.add_task("🎥 Processing media file...", total=100)
 
-                progress.update(main_task, description="🔊 Extracting and processing audio...", completed=5)
+                progress.update(
+                    main_task,
+                    description="🔊 Extracting and processing audio...",
+                    completed=5,
+                )
 
                 # Start transcription
-                import asyncio
 
                 # Custom progress callback (simplified simulation)
                 def progress_callback(stage: str, percent: int):
                     if stage == "audio_processing":
                         progress.update(
-                            main_task, description="✂️  Processing audio chunks...", completed=20 + percent * 0.3
+                            main_task,
+                            description="✂️  Processing audio chunks...",
+                            completed=20 + percent * 0.3,
                         )
                     elif stage == "transcription":
                         progress.update(
-                            main_task, description="🤖 Running AI transcription...", completed=50 + percent * 0.4
+                            main_task,
+                            description="🤖 Running AI transcription...",
+                            completed=50 + percent * 0.4,
                         )
                     elif stage == "output":
                         progress.update(
-                            main_task, description="📝 Generating WebVTT output...", completed=90 + percent * 0.1
+                            main_task,
+                            description="📝 Generating WebVTT output...",
+                            completed=90 + percent * 0.1,
                         )
 
-                progress.update(main_task, description="🤖 Running AI transcription...", completed=20)
+                progress.update(
+                    main_task,
+                    description="🤖 Running AI transcription...",
+                    completed=20,
+                )
 
                 result = asyncio.run(
                     transcriber.transcribe(
-                        media_path=input_path_obj, output_path=Path(output_path) if output_path else None, **kwargs
+                        media_path=input_path_obj,
+                        output_path=Path(output_path) if output_path else None,
+                        **kwargs,
                     )
                 )
 
-                progress.update(main_task, description="✅ Transcription completed!", completed=100)
+                progress.update(
+                    main_task, description="✅ Transcription completed!", completed=100
+                )
 
             # Calculate processing time and performance metrics
             total_time = time.time() - start_time
@@ -272,7 +305,9 @@ class VttiroCLI:
                 {
                     "file_size_mb": f"{file_size_mb:.1f}",
                     "media_duration": f"{duration:.1f}s",
-                    "words_per_second": f"{word_count / duration:.1f}" if duration > 0 else "0",
+                    "words_per_second": (
+                        f"{word_count / duration:.1f}" if duration > 0 else "0"
+                    ),
                     "processing_efficiency": f"{processing_speed:.2f}x",
                     "engine": engine,
                     "model": model or "default",
@@ -301,22 +336,37 @@ class VttiroCLI:
 
 🚀 [green]Your WebVTT subtitle file is ready to use![/green]"""
 
-            console.print(Panel(summary_info, border_style="green", title="🎬 Transcription Complete"))
+            console.print(
+                Panel(
+                    summary_info,
+                    border_style="green",
+                    title="🎬 Transcription Complete",
+                )
+            )
 
             # Additional performance insights for verbose mode
             if verbose and duration > 0:
-                avg_words_per_segment = word_count / len(result.segments) if result.segments else 0
+                avg_words_per_segment = (
+                    word_count / len(result.segments) if result.segments else 0
+                )
                 console.print()
                 console.print("📈 [dim]Performance Details:[/dim]")
-                console.print(f"   [dim]Average segment length: {duration / len(result.segments):.1f} seconds[/dim]")
-                console.print(f"   [dim]Average words per segment: {avg_words_per_segment:.1f} words[/dim]")
-                console.print(f"   [dim]Words per second: {word_count / duration:.1f} words/sec[/dim]")
+                console.print(
+                    f"   [dim]Average segment length: {duration / len(result.segments):.1f} seconds[/dim]"
+                )
+                console.print(
+                    f"   [dim]Average words per segment: {avg_words_per_segment:.1f} words[/dim]"
+                )
+                console.print(
+                    f"   [dim]Words per second: {word_count / duration:.1f} words/sec[/dim]"
+                )
 
         except Exception as e:
             console.print(f"[red]❌ Transcription failed: {e}[/red]")
-            console.print(f"💡 [yellow]Try running 'vttiro validate {input_path}' to check configuration.[/yellow]")
+            console.print(
+                f"💡 [yellow]Try running 'vttiro validate {input_path}' to check configuration.[/yellow]"
+            )
             if verbose:
-                import traceback
 
                 console.print(traceback.format_exc())
 
@@ -363,7 +413,7 @@ class VttiroCLI:
             vttiro providers
 
         Then use results with:
-            vttiro transcribe video.mp4 --engine=openai --model=whisper-1
+            vttiro transcribe video.mp4 --engine=openai --model=gpt-4o-transcribe
         """
         transcriber = Transcriber(self.config)
         providers = transcriber.get_supported_providers()
@@ -387,11 +437,15 @@ class VttiroCLI:
             models = engine_models.get(provider, [])
             if models:
                 models_str = ", ".join(models)
-                provider_info.append(f"• [cyan]{provider}[/cyan] - Models: {models_str}")
+                provider_info.append(
+                    f"• [cyan]{provider}[/cyan] - Models: {models_str}"
+                )
             else:
                 provider_info.append(f"• [cyan]{provider}[/cyan]")
 
-        console.print(Panel("\n".join(provider_info), title="🤖 Available Engines and Models"))
+        console.print(
+            Panel("\n".join(provider_info), title="🤖 Available Engines and Models")
+        )
 
     def apikeys(self) -> None:
         """Check API key configuration and troubleshoot authentication issues.
@@ -459,7 +513,7 @@ class VttiroCLI:
             vttiro validate                                    # Full system check
             vttiro validate --engine=openai                   # Check specific engine
             vttiro validate video.mp4 --engine=gemini         # Check file + engine
-            vttiro validate --input_path=audio.wav --model=whisper-1
+            vttiro validate --input_path=audio.wav --model=gpt-4o-transcribe
         """
         console.print("[bold]🔍 Validating VTTiro Configuration...[/bold]\n")
 
@@ -517,7 +571,9 @@ class VttiroCLI:
             console.print("[bold red]❌ Validation Failed[/bold red]\n")
             for issue in issues:
                 console.print(f"  {issue}")
-            console.print("\n💡 [yellow]Fix these issues before running transcriptions.[/yellow]")
+            console.print(
+                "\n💡 [yellow]Fix these issues before running transcriptions.[/yellow]"
+            )
             console.print("   Use 'vttiro apikeys' to check API configuration.")
         else:
             console.print("[bold green]✅ All Validation Checks Passed![/bold green]")
@@ -577,7 +633,11 @@ class VttiroCLI:
             console.print(f"[red]Error loading configuration: {e}[/red]")
 
     def profile_create(
-        self, profile_name: str, engine: str = "gemini", model: str | None = None, format: str = "yaml"
+        self,
+        profile_name: str,
+        engine: str = "gemini",
+        model: str | None = None,
+        format: str = "yaml",
     ) -> None:
         """Create a new configuration profile.
 
@@ -590,7 +650,7 @@ class VttiroCLI:
         Examples:
             vttiro profile_create dev --engine=gemini --model=gemini-2.5-flash
             vttiro profile_create production --engine=gemini --model=gemini-2.5-pro
-            vttiro profile_create batch --engine=openai --model=whisper-1
+            vttiro profile_create batch --engine=openai --model=gpt-4o-transcribe
         """
         try:
             from vttiro.core.config import VttiroConfig
@@ -601,7 +661,9 @@ class VttiroCLI:
             # Save as profile
             profile_path = config.to_profile(profile_name, format=format)
 
-            console.print(f"✅ [green]Profile '{profile_name}' created at {profile_path}[/green]")
+            console.print(
+                f"✅ [green]Profile '{profile_name}' created at {profile_path}[/green]"
+            )
             console.print(f"💡 [dim]Use with: vttiro profile_use {profile_name}[/dim]")
         except Exception as e:
             console.print(f"[red]Error creating profile: {e}[/red]")
@@ -639,7 +701,9 @@ class VttiroCLI:
             )
 
             console.print(Panel(config_info, title=f"📋 Profile: {profile_name}"))
-            console.print(f"💡 [dim]Use this profile with: vttiro transcribe file.mp4 --profile={profile_name}[/dim]")
+            console.print(
+                f"💡 [dim]Use this profile with: vttiro transcribe file.mp4 --profile={profile_name}[/dim]"
+            )
         except Exception as e:
             console.print(f"[red]Error loading profile: {e}[/red]")
 
@@ -666,13 +730,17 @@ class VttiroCLI:
                 profiles.extend(profile_dir.glob(f"*{ext}"))
 
             if not profiles:
-                console.print("📁 [yellow]No profiles found. Create profiles with 'vttiro profile_create'[/yellow]")
+                console.print(
+                    "📁 [yellow]No profiles found. Create profiles with 'vttiro profile_create'[/yellow]"
+                )
                 return
 
             profile_info = []
             for profile_path in sorted(profiles):
                 name = profile_path.stem
-                format_type = "YAML" if profile_path.suffix in [".yaml", ".yml"] else "JSON"
+                format_type = (
+                    "YAML" if profile_path.suffix in [".yaml", ".yml"] else "JSON"
+                )
                 profile_info.append(f"• [cyan]{name}[/cyan] ({format_type})")
 
             console.print(
@@ -683,7 +751,9 @@ class VttiroCLI:
                 )
             )
 
-            console.print("\n💡 [dim]Use profiles with: vttiro profile_use <profile_name>[/dim]")
+            console.print(
+                "\n💡 [dim]Use profiles with: vttiro profile_use <profile_name>[/dim]"
+            )
 
         except Exception as e:
             console.print(f"[red]Error listing profiles: {e}[/red]")
@@ -699,22 +769,30 @@ class VttiroCLI:
         try:
             from vttiro.core.config import VttiroConfig
 
-            console.print("🔧 [bold]Initializing default configuration profiles...[/bold]\n")
+            console.print(
+                "🔧 [bold]Initializing default configuration profiles...[/bold]\n"
+            )
 
             profiles = VttiroConfig.create_default_profiles()
 
             for profile_name, profile_path in profiles.items():
-                console.print(f"✅ Created profile '[cyan]{profile_name}[/cyan]' at {profile_path}")
+                console.print(
+                    f"✅ Created profile '[cyan]{profile_name}[/cyan]' at {profile_path}"
+                )
 
             console.print("\n🎉 [green]Default profiles initialized![/green]")
             console.print(f"📁 Profiles saved to: [cyan]{profile_path.parent}[/cyan]")
-            console.print(f"\n💡 [dim]Available profiles: {', '.join(profiles.keys())}[/dim]")
+            console.print(
+                f"\n💡 [dim]Available profiles: {', '.join(profiles.keys())}[/dim]"
+            )
             console.print("💡 [dim]Use with: vttiro profile_use <profile_name>[/dim]")
 
         except Exception as e:
             console.print(f"[red]Error initializing profiles: {e}[/red]")
 
-    def _resolve_prompt_parameters(self, full_prompt: str | None, prompt: str | None) -> dict[str, str | None]:
+    def _resolve_prompt_parameters(
+        self, full_prompt: str | None, prompt: str | None
+    ) -> dict[str, str | None]:
         """Resolve prompt parameters.
 
         Args:

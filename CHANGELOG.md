@@ -1,5 +1,11 @@
 ## vttiro Changelog
 
+## [v2.0.1 - Critical Code Restoration] - 2025-08-22
+*   **GeminiTranscriber Recovery:** Restored accidentally deleted `GeminiTranscriber` class implementation (739 lines) from commit `6592c32b`, resolving import failures that prevented Gemini-based transcription from working
+*   **API Compatibility Fixes:** Updated `log_provider_debug()` function calls to match current signature (provider, operation, details, success) and fixed `build_webvtt_prompt()` parameter usage for current API
+*   **Import Resolution:** Confirmed successful import resolution for `from vttiro.providers.gemini.transcriber import GeminiTranscriber` and restored full transcription pipeline functionality
+*   **Core Functionality Restored:** All Gemini transcription capabilities now operational, completing the core transcription workflow for the primary AI provider
+
 ## [v1.0.9 - Validation & Profile Bloat Removal] - 2025-08-22
 *   **Massive Validation Simplification:** Stripped `input_validation.py` from 357 lines to 18 lines (95% reduction), removing InputValidator class, complex format detection, provider compatibility matrices, processing estimates, and over-engineered validation theater
 *   **Configuration Debloating:** Removed all profile management methods from `config.py` including `from_profile()`, `to_profile()`, `create_default_profiles()`, project config discovery, environment validation, and complex prompt validation - eliminated 400+ lines of unnecessary complexity

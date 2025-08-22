@@ -32,7 +32,11 @@ If you hear unclear speech, use [unclear] to mark uncertain sections.
 Maintain natural speech patterns and include appropriate punctuation."""
 
 # Prompt composition patterns
-PROMPT_PATTERNS = {"append": "{default}\n\n{user}", "prepend": "{user}\n\n{default}", "template": "{user}"}
+PROMPT_PATTERNS = {
+    "append": "{default}\n\n{user}",
+    "prepend": "{user}\n\n{default}",
+    "template": "{user}",
+}
 
 
 class VttiroConfig(BaseModel):
@@ -55,19 +59,29 @@ class VttiroConfig(BaseModel):
 
     # Legacy provider field for backward compatibility
     provider: Literal["gemini", "openai", "assemblyai", "deepgram"] | None = Field(
-        default=None, description="[DEPRECATED] Use 'engine' instead. AI transcription provider to use"
+        default=None,
+        description="[DEPRECATED] Use 'engine' instead. AI transcription provider to use",
     )
 
     # Model Selection
-    model: str | None = Field(default=None, description="Specific model to use for the selected engine")
+    model: str | None = Field(
+        default=None, description="Specific model to use for the selected engine"
+    )
 
     # Language and Content
-    language: str | None = Field(default=None, description="Language code (ISO 639-1) or None for auto-detection")
+    language: str | None = Field(
+        default=None, description="Language code (ISO 639-1) or None for auto-detection"
+    )
 
     # Prompt Configuration (replaces context)
-    full_prompt: str | None = Field(default=None, description="Complete replacement for the default built-in prompt")
+    full_prompt: str | None = Field(
+        default=None, description="Complete replacement for the default built-in prompt"
+    )
 
-    prompt: str | None = Field(default=None, description="Additional prompt content to append to default prompt")
+    prompt: str | None = Field(
+        default=None,
+        description="Additional prompt content to append to default prompt",
+    )
 
     # Legacy context field for backward compatibility
     context: str | None = Field(
@@ -80,53 +94,85 @@ class VttiroConfig(BaseModel):
         default="webvtt", description="Output format for transcription results"
     )
 
-    output_path: Path | None = Field(default=None, description="Output file path, None for auto-generation")
+    output_path: Path | None = Field(
+        default=None, description="Output file path, None for auto-generation"
+    )
 
     # Processing Options
-    enable_speaker_diarization: bool = Field(default=False, description="Enable speaker identification when supported")
+    enable_speaker_diarization: bool = Field(
+        default=False, description="Enable speaker identification when supported"
+    )
 
-    enable_emotion_detection: bool = Field(default=False, description="Enable emotion detection when supported")
+    enable_emotion_detection: bool = Field(
+        default=False, description="Enable emotion detection when supported"
+    )
 
     # Audio Processing
     audio_preprocessing: bool = Field(
-        default=True, description="Enable audio preprocessing (normalization, format conversion)"
+        default=True,
+        description="Enable audio preprocessing (normalization, format conversion)",
     )
 
     max_segment_duration: float = Field(
-        default=30.0, gt=0, le=120.0, description="Maximum duration for audio segments in seconds"
+        default=30.0,
+        gt=0,
+        le=120.0,
+        description="Maximum duration for audio segments in seconds",
     )
 
     # Provider-Specific Settings
-    gemini_model: str = Field(default="gemini-2.0-flash", description="Gemini model to use for transcription")
+    gemini_model: str = Field(
+        default="gemini-2.5-flash", description="Gemini model to use for transcription"
+    )
 
-    openai_model: str = Field(default="whisper-1", description="OpenAI model to use for transcription")
+    openai_model: str = Field(
+        default="gpt-4o-transcribe", description="OpenAI model to use for transcription"
+    )
 
     # Performance and Reliability
-    timeout_seconds: float = Field(default=300.0, gt=0, description="Request timeout in seconds")
+    timeout_seconds: float = Field(
+        default=300.0, gt=0, description="Request timeout in seconds"
+    )
 
-    max_retries: int = Field(default=3, ge=0, le=10, description="Maximum number of retry attempts")
+    max_retries: int = Field(
+        default=3, ge=0, le=10, description="Maximum number of retry attempts"
+    )
 
     # Development and Debugging
-    verbose: bool = Field(default=False, description="Enable verbose logging and debug output")
+    verbose: bool = Field(
+        default=False, description="Enable verbose logging and debug output"
+    )
 
-    debug: bool = Field(default=False, description="Enable debug mode (preserve working directories)")
+    debug: bool = Field(
+        default=False, description="Enable debug mode (preserve working directories)"
+    )
 
-    dry_run: bool = Field(default=False, description="Validate configuration and estimate costs without transcribing")
+    dry_run: bool = Field(
+        default=False,
+        description="Validate configuration and estimate costs without transcribing",
+    )
 
     # Feature Flags for Risk Mitigation
     use_legacy_providers: bool = Field(
-        default=False, description="Use legacy src_old providers instead of new src providers (EMERGENCY FALLBACK)"
+        default=False,
+        description="Use legacy src_old providers instead of new src providers (EMERGENCY FALLBACK)",
     )
 
     legacy_fallback_enabled: bool = Field(
-        default=True, description="Automatically fallback to src_old providers if new providers fail"
+        default=True,
+        description="Automatically fallback to src_old providers if new providers fail",
     )
 
     legacy_fallback_threshold: int = Field(
-        default=2, ge=1, le=10, description="Number of failures before triggering legacy fallback"
+        default=2,
+        ge=1,
+        le=10,
+        description="Number of failures before triggering legacy fallback",
     )
 
-    model_config = ConfigDict(env_prefix="VTTIRO_", env_file=".env", validate_assignment=True, extra="forbid")
+    model_config = ConfigDict(
+        env_prefix="VTTIRO_", env_file=".env", validate_assignment=True, extra="forbid"
+    )
 
     def get_provider_config(self) -> dict[str, Any]:
         """Get provider-specific configuration.
@@ -169,7 +215,9 @@ class VttiroConfig(BaseModel):
 
             if pattern in PROMPT_PATTERNS:
                 template = PROMPT_PATTERNS[pattern]
-                return template.format(default=DEFAULT_TRANSCRIPTION_PROMPT.strip(), user=user_prompt).strip()
+                return template.format(
+                    default=DEFAULT_TRANSCRIPTION_PROMPT.strip(), user=user_prompt
+                ).strip()
             # Fallback to append pattern
             return f"{DEFAULT_TRANSCRIPTION_PROMPT.strip()}\n\n{user_prompt}"
 
@@ -223,11 +271,15 @@ class VttiroConfig(BaseModel):
                 with open(config_path) as f:
                     data = yaml.safe_load(f)
             except ImportError:
-                raise ValueError("YAML support not available. Install with: pip install pyyaml")
+                raise ValueError(
+                    "YAML support not available. Install with: pip install pyyaml"
+                )
 
         return cls(**data)
 
-    def to_file(self, config_path: Path, format: Literal["json", "yaml"] = "yaml") -> None:
+    def to_file(
+        self, config_path: Path, format: Literal["json", "yaml"] = "yaml"
+    ) -> None:
         """Save configuration to file.
 
         Args:
@@ -254,6 +306,8 @@ class VttiroConfig(BaseModel):
                 with open(config_path, "w") as f:
                     yaml.dump(clean_data, f, default_flow_style=False, indent=2)
             except NameError:
-                raise ValueError("YAML support not available. Install with: pip install pyyaml")
+                raise ValueError(
+                    "YAML support not available. Install with: pip install pyyaml"
+                )
         else:
             raise ValueError(f"Unsupported format: {format}. Use 'json' or 'yaml'")
