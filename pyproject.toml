@@ -37,15 +37,15 @@ classifiers = [
 
 # Core dependencies required for all installation modes
 dependencies = [
-    'pydantic>=2.5.0',          # Data validation and settings management
-    'loguru>=0.7.2',            # Advanced logging with structured output
-    'fire>=0.5.0',              # CLI framework
-    'rich>=13.7.0',             # Beautiful terminal output and progress bars
-    'pyyaml>=6.0.1',            # YAML configuration support
-    'httpx>=0.26.0',            # Modern HTTP client for async requests
-    'yt-dlp>=2024.12.13',       # Video downloading and processing
-    'ffmpeg-python>=0.2.0',     # FFmpeg integration for audio processing
-    'psutil>=6.1.0',            # System resource monitoring for performance metrics
+    'pydantic>=2.5.0', # Data validation and settings management
+    'loguru>=0.7.2', # Advanced logging with structured output
+    'fire>=0.5.0', # CLI framework
+    'rich>=13.7.0', # Beautiful terminal output and progress bars
+    'pyyaml>=6.0.1', # YAML configuration support
+    'httpx>=0.26.0', # Modern HTTP client for async requests
+    'yt-dlp>=2024.12.13', # Video downloading and processing
+    'ffmpeg-python>=0.2.0', # FFmpeg integration for audio processing
+    'psutil>=6.1.0',
 ]
 
 # Author information

@@ -1,72 +1,92 @@
-# VTTiro v2.0 Quality Improvement TODO
+# VTTiro Simplification Tasks (Task 302 Analysis)
 
-## ✅ MAJOR CLEANUP COMPLETED (85% reduction achieved)
+## Phase 1: Remove Over-Engineered Components
+
+### A. Enterprise-Level Systems (Priority: HIGH)
+- [ ] Remove Resilience Framework (`src/vttiro/core/resilience.py`)
+- [ ] Replace with simple retry decorator using `tenacity` library
+- [ ] Update all providers to use basic retry pattern
+- [ ] Remove circuit breaker complexity
+- [ ] Remove Configuration Schema System (`src/vttiro/validation/config_schema.py`)
+- [ ] Keep basic Pydantic validation in VttiroConfig only
+- [ ] Remove schema versioning and migration support
+- [ ] Simplify config validation to essential checks
+- [ ] Remove Output Quality Analyzer (`src/vttiro/output/quality_analyzer.py`)
+- [ ] Replace with basic WebVTT format validation
+- [ ] Remove quality metrics, accessibility scoring
+- [ ] Keep only essential timestamp and content validation
+
+### B. Unnecessary Abstractions (Priority: HIGH)
+- [ ] Remove Multi-Format Exporter (`src/vttiro/output/multi_format_exporter.py`)
+- [ ] Focus on WebVTT only (core objective)
+- [ ] Remove SRT, TTML, ASS format support
+- [ ] Simplify enhanced_webvtt.py to standard WebVTT generation
+- [ ] Remove LLM Helper (`src/vttiro/utils/llm_helper.py`)
+- [ ] Remove context enhancement via OpenAI
+- [ ] Revert prompt.py changes that depend on LLM helper
+
+## Phase 2: Simplify Over-Complicated Components
+
+### A. Input Validation System (Priority: MEDIUM)
+- [ ] Simplify Input Validation (`src/vttiro/utils/input_validation.py`)
+- [ ] Replace complex validation with basic file checks
+- [ ] Use pathlib and mimetypes for simple validation
+- [ ] Remove detailed error reporting system
+
+### B. Enhanced WebVTT Formatter (Priority: MEDIUM)
+- [ ] Simplify WebVTT Formatter (`src/vttiro/output/enhanced_webvtt.py`)
+- [ ] Remove accessibility scoring and WCAG compliance
+- [ ] Remove advanced line breaking algorithms
+- [ ] Keep basic WebVTT format with timestamps and speaker labels
+
+## Phase 3: Remove Redundant Components
+
+### A. Testing Infrastructure (Priority: HIGH)
+- [ ] Consolidate Test Directories
+- [ ] Remove entire `src/vttiro/tests/` directory
+- [ ] Move essential tests to main `tests/` directory
+- [ ] Remove duplicate test configurations
+- [ ] Remove Security Module (`src/vttiro/security/security.py`)
+- [ ] Use direct environment variable access
+- [ ] Update providers to use standard env vars
+
+### B. Development Infrastructure (Priority: LOW)
+- [ ] Remove CI Enhancement System (`scripts/ci_enhancement.py`)
+- [ ] Keep simple CI workflows only
+- [ ] Remove pipeline management complexity
+- [ ] Simplify GitHub Actions workflows
+
+## Phase 4: Remove Non-Core Components
+
+### A. External Dependencies (Priority: MEDIUM)
+- [ ] Remove External Repository Integration (`external/repos/`)
+- [ ] Use proper pip dependencies instead
+- [ ] Remove local repository copies
+- [ ] Update imports to use installed packages
+
+### B. Development Utilities (Priority: LOW)
+- [ ] Remove Advanced Testing
+- [ ] Remove property-based testing files
+- [ ] Remove memory profiling and benchmarks
+- [ ] Keep basic integration tests only
+- [ ] Remove Debugging Infrastructure (`src/vttiro/utils/debugging.py`)
+- [ ] Remove comprehensive diagnostic system
+- [ ] Keep basic logging only
+
+## Phase 5: Clean Up and Consolidation
+
+### A. Code Cleanup (Priority: MEDIUM)
+- [ ] Fix Duplicate Imports in provider files
+- [ ] Consolidate Configuration (remove pytest.ini, use pyproject.toml)
+- [ ] Standardize Logging (loguru only, remove standard logging)
+- [ ] Update Documentation to reflect simplified architecture
+
+### B. Dependencies Cleanup (Priority: LOW)
+- [ ] Remove Unused Dependencies from pyproject.toml
+- [ ] Simplify Optional Dependencies groups
+- [ ] Update Requirements to minimal set
+
+---
+
+## ✅ PREVIOUS MAJOR CLEANUP COMPLETED (85% reduction achieved)
 **Removed 123,420 lines (85% reduction from 145,274 to 21,854 lines)**
-
-### Completed Major Tasks ✅
-- [x] Removed complete migration files (2,144+ lines)
-- [x] Removed entire enterprise directories (~55,000+ lines)
-- [x] Cleaned up core directories to essentials only
-- [x] Fixed broken imports and updated configuration
-- [x] Removed deprecated CLI parameters and backward compatibility code
-- [x] Removed legacy testing infrastructure from GitHub workflows
-- [x] Updated CHANGELOG.md with v2.1.42 completion
-
----
-
-## ✅ Phase 6: Final Quality & Polish Tasks - COMPLETED
-
-### 6.1 Documentation Update for v2.0 ✅ COMPLETED
-- [x] Update `README.md` to reflect simplified v2.0 architecture
-  - [x] Remove references to monitoring, intelligence, operations, optimization directories
-  - [x] Update installation instructions to match simplified package
-  - [x] Update usage examples to reflect new CLI without deprecated flags
-  - [x] Simplify feature list to focus on core transcription capabilities
-
-### 6.2 Version Management & Dependencies ✅ COMPLETED
-- [x] Remove leftover enterprise files (`ecosystem_coordinator.py`, `reliability_performance_enhancer.py`)
-- [x] Clean up optional dependencies for removed features in `pyproject.toml`
-- [x] Remove unused ML/plotting dependencies (scikit-learn, matplotlib, seaborn, plotly)
-- [x] Keep essential dependencies for audio processing (numpy, scipy for local mode)
-- [ ] Update version to 2.0.0 in `pyproject.toml` (requires git tag - user decision)
-
-### 6.3 Code Reliability & Error Handling ✅ COMPLETED
-- [x] Test import statements and fix any remaining broken imports
-- [x] Fix `utils/__init__.py` to import actual functions from modules
-- [x] Fix registry imports and replace with simplified fallbacks
-- [x] Fix debugging module imports and remove enterprise dependencies
-- [x] Verify all remaining Python files can be imported without errors
-- [x] Clean up `__all__` exports in key modules for clean public API
-
----
-
-## ✅ FINAL STATUS: ALL TASKS COMPLETED
-
-**🎉 VTTiro v2.0 Cleanup Successfully Completed!**
-
-### Summary of Achievements:
-- **Massive Code Reduction**: 85% reduction (145,274 → 21,854 lines)
-- **Enterprise Bloat Removed**: Monitoring, intelligence, optimization, operations directories eliminated
-- **Backwards Compatibility Cleaned**: All legacy flags, migration code, and compatibility layers removed
-- **Dependencies Optimized**: Removed unused ML/plotting libraries, kept essential audio processing
-- **Import Issues Fixed**: All remaining modules import successfully
-- **Documentation Updated**: README.md reflects simplified v2.0 architecture
-- **CLI Modernized**: Clean interface without deprecated flags
-
-### Core Functionality Preserved:
-✅ Video/audio transcription (Gemini, OpenAI, AssemblyAI, Deepgram)
-✅ WebVTT subtitle generation with timestamps
-✅ Speaker diarization capabilities
-✅ CLI interface with fire + rich
-✅ Configuration management
-✅ Provider abstraction and fallbacks
-✅ Error handling and logging
-
-### Technical Quality:
-✅ All Python modules import successfully
-✅ No broken import dependencies
-✅ Clean package structure
-✅ Simplified dependency tree
-✅ Ready for v2.0 release
-
-**The project has been successfully transformed from an over-engineered enterprise system into a clean, focused transcription tool that does one thing exceptionally well.**

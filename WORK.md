@@ -62,3 +62,44 @@
 - ❌ Legacy migration utilities
 
 The codebase has been successfully transformed from an over-engineered enterprise system into a clean, focused transcription tool!
+
+## Task 302 Implementation Progress ⏳
+
+### Task 302a - COMPLETED ✅ 
+**Enhanced src/vttiro/utils/prompt.py**
+- ✅ Preserved hand-modified `prompt_parts` in `build_webvtt_prompt`
+- ✅ Adapted `build_plain_text_prompt` specs from `build_webvtt_prompt` 
+- ✅ Added good and bad WebVTT examples with explanations
+- ✅ Simplified `optimize_prompt_for_provider` (removed over-engineering)
+
+### Task 302b - PARTIALLY COMPLETED ⚠️
+**LLM Helper Implementation - REVERTED**
+- ⚠️ Created customizable OpenAI integration with klepto caching
+- ⚠️ Enhanced `extract_context_from_metadata` with LLM processing
+- ⚠️ Added `add_context_specific_instructions` function
+- ❌ **REVERTED**: LLM helper identified as not aligned with core objective
+- ✅ Removed `llm_helper.py`, reverted prompt changes, cleaned dependencies
+
+### Task 302c - COMPLETED ✅
+**Codebase Over-Engineering Analysis**  
+- ✅ Generated comprehensive analysis of current codebase (~78,530 tokens)
+- ✅ Identified 60-70% additional simplification opportunity
+- ✅ Categorized issues: over-engineered, over-complicated, redundant, duplicated, non-core
+- ✅ Created detailed PLAN.md with 5-phase simplification strategy
+- ✅ Updated TODO.md with specific actionable tasks
+
+### Task 302d - IN PROGRESS ⏳
+**Execute Planned Tasks**
+- ⏳ Ready to begin systematic simplification
+- ⏳ Will run `gitnextver .` after significant progress
+
+## Next Phase: Systematic Over-Engineering Removal
+
+Following the Task 302 analysis, identified key areas for simplification:
+1. **Remove Enterprise Systems** (resilience, config schema, quality analyzer)
+2. **Simplify WebVTT Output** (remove multi-format, accessibility scoring)
+3. **Consolidate Testing** (remove duplicate test infrastructure)
+4. **Clean External Dependencies** (remove local repos, use pip)
+5. **Final Polish** (imports, config, documentation)
+
+**Target**: Additional 60-70% reduction (78,530 → ~25,000 tokens)
