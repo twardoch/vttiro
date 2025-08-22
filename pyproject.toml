@@ -509,3 +509,9 @@ ban-relative-imports = 'all' # Ban all relative imports for consistency
     'TID252'
     # Allow relative imports in tests for convenience
 ]
+
+[dependency-groups]
+dev = [
+    "hatch>=1.14.1",
+    "hatch-vcs>=0.5.0",
+]

@@ -21,6 +21,7 @@ from .prompt import (
     extract_context_from_metadata
 )
 from .input_validation import InputValidator
+from .api_keys import get_api_key_with_fallbacks, get_all_available_api_keys
 
 __all__ = [
     # Timestamp utilities
@@ -36,4 +37,7 @@ __all__ = [
     'extract_context_from_metadata',
     # Validation utilities
     'InputValidator',
+    # API key utilities
+    'get_api_key_with_fallbacks',
+    'get_all_available_api_keys',
 ]

@@ -1,5 +1,12 @@
 ## vttiro Changelog
 
+## [v1.0.6 - Hatch Build System Migration] - 2025-08-22
+*   **Build System Modernization:** Migrated to hatch and hatch-vcs for automatic semantic versioning based on git tags and commits
+*   **Automatic Version Management:** `__version__.py` now generated automatically from git history (no longer tracked in version control)
+*   **Configuration Updates:** Updated pyproject.toml with proper hatch-vcs configuration, added `__version__.py` to .gitignore
+*   **Dynamic Versioning:** Version now automatically includes commit hash and date for development builds (e.g., `1.0.6.dev2+gc18635658.d20250822`)
+*   **Build Verification:** Confirmed hatch build system works correctly, packages include dynamically generated version information
+
 ## [v1.0.4 - RADICAL TRIMDOWN: From Enterprise Monster to Focused Tool] - 2025-08-22
 *   **MASSIVE BLOAT ELIMINATION:** Deleted 15,495+ lines of over-engineered enterprise complexity, reducing codebase to 5,411 lines in 25 focused files (74% reduction from bloated state).
 *   **DELETED ENTERPRISE MODULES:** Removed 6 entire over-engineered systems: resilience framework (circuit breakers, enterprise retry patterns), quality analyzer (accessibility scoring), multi-format exporter (SRT/TTML complexity), security theater (unnecessary API encryption), configuration schema (complex validation), internal test duplication.

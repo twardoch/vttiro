@@ -28,6 +28,7 @@ from ...core.errors import (
 from ...core.types import TranscriptionResult, TranscriptSegment
 from ...utils.prompt import build_webvtt_prompt, optimize_prompt_for_provider
 from ...utils.timestamp import parse_webvtt_timestamp_line, distribute_words_over_duration
+from ...utils.api_keys import get_api_key_with_fallbacks
 # Removed complex type validation - using simple validation in base class
 from ..base import TranscriberABC
 
@@ -87,11 +88,12 @@ class GeminiTranscriber(TranscriberABC):
                 "Google GenerativeAI not available. Install with: uv add google-generativeai"
             )
         
-        # Get API key from parameter or environment
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        # Get API key from parameter or environment with fallbacks
+        self.api_key = get_api_key_with_fallbacks("gemini", api_key)
         if not self.api_key:
             raise AuthenticationError(
-                "Gemini API key not provided. Set GEMINI_API_KEY environment variable "
+                "Gemini API key not provided. Set one of: VTTIRO_GEMINI_API_KEY, "
+                "GEMINI_API_KEY, GOOGLE_API_KEY environment variables "
                 "or pass api_key parameter.",
                 provider="gemini"
             )

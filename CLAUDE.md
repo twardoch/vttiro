@@ -1,6 +1,65 @@
 <poml>
   <role>You are an expert software developer, a project manager who follows strict development guidelines and methodologies, and a multilingual inspired genius ficton & marketing writer and poet.</role>
   
+  <h>vttiro Development Loop</h>
+  
+  <section>
+    <h>Development Workflow</h>
+    
+    <cp caption="After Making Changes - Testing Protocol">
+      <list>
+        <item><b>Quick Validation:</b> <code inline="true">uv run vttiro version</code> - Verify package loads correctly</item>
+        <item><b>Format & Lint:</b> <code inline="true">fd -e py -x uvx ruff format --respect-gitignore {}; fd -e py -x uvx ruff check --fix {}</code></item>
+        <item><b>Type Check:</b> <code inline="true">uvx mypy src/vttiro --ignore-missing-imports</code></item>
+        <item><b>Unit Tests:</b> <code inline="true">uv run python -m pytest tests/ -v</code></item>
+        <item><b>Integration Test:</b> <code inline="true">bash temp/test2.sh</code> - Full transcription test with all models</item>
+        <item><b>Build Test:</b> <code inline="true">hatch build --clean</code> - Verify package builds correctly</item>
+      </list>
+    </cp>
+    
+    <cp caption="Error Diagnosis & Debugging">
+      <list>
+        <item><b>Runtime Errors:</b> Check detailed logs with <code inline="true">--verbose --debug</code> flags</item>
+        <item><b>API Issues:</b> Verify environment variables: <code inline="true">echo $VTTIRO_GEMINI_API_KEY</code>, <code inline="true">echo $VTTIRO_OPENAI_API_KEY</code></item>
+        <item><b>Import Errors:</b> Run <code inline="true">uv run python -c "import vttiro; print('OK')"</code></item>
+        <item><b>Audio Processing:</b> Check FFmpeg: <code inline="true">ffmpeg -version</code></item>
+        <item><b>Provider Testing:</b> <code inline="true">uv run vttiro providers</code> - List available engines</item>
+        <item><b>Log Locations:</b> Runtime logs output to console with structured logging (INFO/DEBUG/ERROR levels)</item>
+      </list>
+    </cp>
+    
+    <cp caption="Configuration & Environment Setup">
+      <list>
+        <item><b>Required API Keys:</b> Set <code inline="true">VTTIRO_GEMINI_API_KEY</code> and <code inline="true">VTTIRO_OPENAI_API_KEY</code> in environment</item>
+        <item><b>Development Install:</b> <code inline="true">uv sync</code> installs all dependencies including dev tools</item>
+        <item><b>Package Structure:</b> Main code in <code inline="true">src/vttiro/</code>, tests in <code inline="true">tests/</code>, config in <code inline="true">pyproject.toml</code></item>
+        <item><b>CLI Entry Point:</b> <code inline="true">vttiro</code> command available after installation via <code inline="true">uv sync</code></item>
+        <item><b>Test Media:</b> Use <code inline="true">test2.mp4</code> for integration testing</item>
+      </list>
+    </cp>
+    
+    <cp caption="Performance & Quality Checks">
+      <list>
+        <item><b>Memory Usage:</b> Monitor during long transcriptions - audio chunking should prevent memory issues</item>
+        <item><b>Audio Quality:</b> Check extracted audio in working directories (e.g., <code inline="true">test2.gemini-2.5-flash1/</code>)</item>
+        <item><b>Output Quality:</b> Verify WebVTT format compliance and timestamp accuracy</item>
+        <item><b>Error Recovery:</b> Test retry behavior with invalid API keys or network issues</item>
+        <item><b>Multi-Model Testing:</b> <code inline="true">temp/test2.sh</code> tests all Gemini and OpenAI models</item>
+      </list>
+    </cp>
+    
+    <cp caption="Debugging Common Issues">
+      <list>
+        <item><b>API Key Invalid:</b> Check environment variables and API key validity</item>
+        <item><b>Audio Extraction Fails:</b> Verify FFmpeg installation and video file integrity</item>
+        <item><b>Import Errors:</b> Run <code inline="true">uv sync</code> to ensure all dependencies installed</item>
+        <item><b>Version Conflicts:</b> Check <code inline="true">uv lock</code> and <code inline="true">hatch version</code> for version management</item>
+        <item><b>WebVTT Format Issues:</b> Enable <code inline="true">--debug</code> to see raw AI responses</item>
+        <item><b>Provider Failures:</b> Test individual providers with <code inline="true">--engine gemini</code> or <code inline="true">--engine openai</code></item>
+      </list>
+    </cp>
+  </section>
+  
   <h>vttiro Project TLDR</h>
   
   <section>

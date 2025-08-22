@@ -26,6 +26,7 @@ from ...core.errors import (
 from ...core.types import TranscriptionResult, TranscriptSegment
 from ...utils.prompt import build_webvtt_prompt, optimize_prompt_for_provider
 from ...utils.timestamp import parse_webvtt_timestamp_line, distribute_words_over_duration
+from ...utils.api_keys import get_api_key_with_fallbacks
 # Removed complex type validation
 from ..base import TranscriberABC
 
@@ -82,11 +83,12 @@ class OpenAITranscriber(TranscriberABC):
                 "OpenAI not available. Install with: uv add openai"
             )
         
-        # Get API key from parameter or environment
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        # Get API key from parameter or environment with fallbacks
+        self.api_key = get_api_key_with_fallbacks("openai", api_key)
         if not self.api_key:
             raise AuthenticationError(
-                "OpenAI API key not provided. Set OPENAI_API_KEY environment variable "
+                "OpenAI API key not provided. Set one of: VTTIRO_OPENAI_API_KEY, "
+                "OPENAI_API_KEY environment variables "
                 "or pass api_key parameter.",
                 provider="openai"
             )

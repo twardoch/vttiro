@@ -26,6 +26,7 @@ from ...core.errors import (
 from ...core.types import TranscriptionResult, TranscriptSegment
 from ...utils.prompt import build_webvtt_prompt, optimize_prompt_for_provider
 from ...utils.timestamp import distribute_words_over_duration
+from ...utils.api_keys import get_api_key_with_fallbacks
 # Removed complex type validation
 from ..base import TranscriberABC
 
@@ -85,11 +86,12 @@ class DeepgramTranscriber(TranscriberABC):
                 "Deepgram SDK not available. Install with: uv add deepgram-sdk"
             )
         
-        # Get API key from parameter or environment
-        self.api_key = api_key or os.getenv("DEEPGRAM_API_KEY")
+        # Get API key from parameter or environment with fallbacks
+        self.api_key = get_api_key_with_fallbacks("deepgram", api_key)
         if not self.api_key:
             raise AuthenticationError(
-                "Deepgram API key not provided. Set DEEPGRAM_API_KEY environment variable "
+                "Deepgram API key not provided. Set one of: VTTIRO_DEEPGRAM_API_KEY, "
+                "DEEPGRAM_API_KEY, DG_API_KEY environment variables "
                 "or pass api_key parameter.",
                 provider="deepgram"
             )
