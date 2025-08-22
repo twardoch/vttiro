@@ -1,210 +1,379 @@
-#!/usr/bin/env python3
 # this_file: src/vttiro/core/config.py
-"""Configuration management for vttiro using Pydantic."""
+"""Configuration management for VTTiro 2.0.
 
-import os
+This module provides typed configuration using Pydantic models, replacing
+the complex enhanced configuration system from v1. Focuses on simplicity,
+type safety, and clear validation rules.
+
+Key improvements over v1:
+- Pydantic-based validation instead of custom validation logic
+- Simplified flat structure instead of nested provider configs
+- Environment variable support with clear precedence
+- Typed fields with sensible defaults
+
+Used by:
+- Core orchestration for provider selection and parameters
+- CLI for argument parsing and validation
+- Provider implementations for accessing settings
+- Tests for configuration validation
+"""
+
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Union
-from dataclasses import dataclass
+from typing import Any, Literal
 
-try:
-    from pydantic import BaseModel, Field, field_validator
-    import yaml
-except ImportError:
-    raise ImportError("Required dependencies missing. Install with: uv pip install --system vttiro")
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
+# Default transcription prompts
+DEFAULT_TRANSCRIPTION_PROMPT = """Please provide an accurate transcription of the audio content.
+Focus on clarity, correct spelling, and proper punctuation.
+If you hear unclear speech, use [unclear] to mark uncertain sections.
+Maintain natural speech patterns and include appropriate punctuation."""
 
-class TranscriptionConfig(BaseModel):
-    """Configuration for transcription engines."""
-    
-    default_model: str = Field(default="auto", description="Default transcription model")
-    preferred_model: str = Field(default="auto", description="Preferred transcription model")
-    ensemble_enabled: bool = Field(default=False, description="Enable multi-model ensemble")
-    confidence_threshold: float = Field(default=0.8, description="Minimum confidence threshold")
-    language: Optional[str] = Field(default=None, description="Default language code")
-    
-    # API configurations
-    gemini_api_key: Optional[str] = Field(default=None, description="Google Gemini API key")
-    assemblyai_api_key: Optional[str] = Field(default=None, description="AssemblyAI API key")
-    deepgram_api_key: Optional[str] = Field(default=None, description="Deepgram API key")
-    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
-    
-    @field_validator('confidence_threshold')
-    def validate_confidence(cls, v):
-        if not 0.0 <= v <= 1.0:
-            raise ValueError('confidence_threshold must be between 0.0 and 1.0')
-        return v
-
-
-class ProcessingConfig(BaseModel):
-    """Configuration for audio/video processing."""
-    
-    chunk_duration: int = Field(default=600, description="Audio chunk duration in seconds")
-    overlap_duration: int = Field(default=30, description="Chunk overlap duration in seconds")
-    max_duration: int = Field(default=36000, description="Maximum video duration in seconds")
-    sample_rate: int = Field(default=16000, description="Audio sample rate in Hz")
-    prefer_integer_seconds: bool = Field(default=True, description="Prefer integer second boundaries")
-    
-    # Energy-based segmentation
-    energy_threshold_percentile: int = Field(default=20, description="Energy threshold percentile")
-    min_energy_window: float = Field(default=2.0, description="Minimum energy window in seconds")
-    
-    @field_validator('chunk_duration')
-    def validate_chunk_duration(cls, v):
-        if v <= 0:
-            raise ValueError('chunk_duration must be positive')
-        return v
-
-
-class DiarizationConfig(BaseModel):
-    """Configuration for speaker diarization."""
-    
-    enabled: bool = Field(default=True, description="Enable speaker diarization")
-    min_speakers: Optional[int] = Field(default=None, description="Minimum number of speakers")
-    max_speakers: Optional[int] = Field(default=10, description="Maximum number of speakers")
-    threshold: float = Field(default=0.7, description="Diarization threshold")
-    huggingface_token: Optional[str] = Field(default=None, description="HuggingFace token for pyannote")
-
-
-class EmotionConfig(BaseModel):
-    """Configuration for emotion detection."""
-    
-    enabled: bool = Field(default=False, description="Enable emotion detection")
-    audio_weight: float = Field(default=0.6, description="Weight for audio-based emotion detection")
-    text_weight: float = Field(default=0.4, description="Weight for text-based emotion detection")
-    confidence_threshold: float = Field(default=0.5, description="Minimum emotion confidence")
-    cultural_adaptation: bool = Field(default=True, description="Enable cultural adaptation")
-
-
-class OutputConfig(BaseModel):
-    """Configuration for subtitle output generation."""
-    
-    default_format: str = Field(default="webvtt", description="Default output format")
-    max_chars_per_line: int = Field(default=42, description="Maximum characters per subtitle line")
-    max_lines_per_cue: int = Field(default=2, description="Maximum lines per subtitle cue")
-    max_cue_duration: float = Field(default=7.0, description="Maximum cue duration in seconds")
-    reading_speed_wpm: int = Field(default=160, description="Reading speed in words per minute")
-    
-    # Accessibility
-    wcag_compliance: str = Field(default="AA", description="WCAG compliance level")
-    include_sound_descriptions: bool = Field(default=True, description="Include sound effect descriptions")
-
-
-class YouTubeConfig(BaseModel):
-    """Configuration for YouTube integration."""
-    
-    enabled: bool = Field(default=False, description="Enable YouTube integration")
-    client_secrets_file: Optional[str] = Field(default=None, description="OAuth client secrets file")
-    quota_limit: int = Field(default=10000, description="Daily quota limit")
-    auto_upload: bool = Field(default=False, description="Automatically upload subtitles")
+# Prompt composition patterns
+PROMPT_PATTERNS = {
+    'append': '{default}\n\n{user}',
+    'prepend': '{user}\n\n{default}',
+    'template': '{user}'
+}
 
 
 class VttiroConfig(BaseModel):
-    """Main configuration class for vttiro."""
+    """Main configuration for VTTiro transcription.
     
-    transcription: TranscriptionConfig = Field(default_factory=TranscriptionConfig)
-    processing: ProcessingConfig = Field(default_factory=ProcessingConfig)  
-    diarization: DiarizationConfig = Field(default_factory=DiarizationConfig)
-    emotion: EmotionConfig = Field(default_factory=EmotionConfig)
-    output: OutputConfig = Field(default_factory=OutputConfig)
-    youtube: YouTubeConfig = Field(default_factory=YouTubeConfig)
+    Simplified configuration model that replaces the complex enhanced config
+    system from v1. Uses Pydantic for validation and type safety.
     
-    # Global settings
-    verbose: bool = Field(default=False, description="Enable verbose logging")
-    temp_dir: Optional[str] = Field(default=None, description="Temporary directory path")
+    Configuration Precedence:
+    1. Explicit parameters passed to methods
+    2. Environment variables (VTTIRO_*)
+    3. Configuration file values
+    4. Default values defined here
+    """
     
-    class Config:
-        """Pydantic configuration."""
-        env_prefix = "VTTIRO_"
-        case_sensitive = False
-        
+    # Engine Selection (replaces provider)
+    engine: Literal["gemini", "openai", "assemblyai", "deepgram"] = Field(
+        default="gemini",
+        description="AI transcription engine to use"
+    )
+    
+    # Legacy provider field for backward compatibility
+    provider: Literal["gemini", "openai", "assemblyai", "deepgram"] | None = Field(
+        default=None,
+        description="[DEPRECATED] Use 'engine' instead. AI transcription provider to use"
+    )
+    
+    # Model Selection
+    model: str | None = Field(
+        default=None,
+        description="Specific model to use for the selected engine"
+    )
+    
+    # Language and Content
+    language: str | None = Field(
+        default=None,
+        description="Language code (ISO 639-1) or None for auto-detection"
+    )
+    
+    # Prompt Configuration (replaces context)
+    full_prompt: str | None = Field(
+        default=None,
+        description="Complete replacement for the default built-in prompt"
+    )
+    
+    prompt: str | None = Field(
+        default=None,
+        description="Additional prompt content to append to default prompt"
+    )
+    
+    # Legacy context field for backward compatibility
+    context: str | None = Field(
+        default=None,
+        description="[DEPRECATED] Use 'full_prompt' or 'prompt' instead. Additional context to improve transcription accuracy"
+    )
+    
+    # Output Configuration  
+    output_format: Literal["webvtt", "srt", "json"] = Field(
+        default="webvtt",
+        description="Output format for transcription results"
+    )
+    
+    output_path: Path | None = Field(
+        default=None,
+        description="Output file path, None for auto-generation"
+    )
+    
+    # Processing Options
+    enable_speaker_diarization: bool = Field(
+        default=False,
+        description="Enable speaker identification when supported"
+    )
+    
+    enable_emotion_detection: bool = Field(
+        default=False,
+        description="Enable emotion detection when supported"
+    )
+    
+    # Audio Processing
+    audio_preprocessing: bool = Field(
+        default=True,
+        description="Enable audio preprocessing (normalization, format conversion)"
+    )
+    
+    max_segment_duration: float = Field(
+        default=30.0,
+        gt=0,
+        le=120.0,
+        description="Maximum duration for audio segments in seconds"
+    )
+    
+    # Provider-Specific Settings
+    gemini_model: str = Field(
+        default="gemini-2.0-flash",
+        description="Gemini model to use for transcription"
+    )
+    
+    openai_model: str = Field(
+        default="whisper-1",
+        description="OpenAI model to use for transcription"
+    )
+    
+    # Performance and Reliability
+    timeout_seconds: float = Field(
+        default=300.0,
+        gt=0,
+        description="Request timeout in seconds"
+    )
+    
+    max_retries: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="Maximum number of retry attempts"
+    )
+    
+    # Development and Debugging
+    verbose: bool = Field(
+        default=False,
+        description="Enable verbose logging and debug output"
+    )
+    
+    dry_run: bool = Field(
+        default=False,
+        description="Validate configuration and estimate costs without transcribing"
+    )
+    
+    # Feature Flags for Risk Mitigation
+    use_legacy_providers: bool = Field(
+        default=False,
+        description="Use legacy src_old providers instead of new src providers (EMERGENCY FALLBACK)"
+    )
+    
+    legacy_fallback_enabled: bool = Field(
+        default=True,
+        description="Automatically fallback to src_old providers if new providers fail"
+    )
+    
+    legacy_fallback_threshold: int = Field(
+        default=2,
+        ge=1,
+        le=10,
+        description="Number of failures before triggering legacy fallback"
+    )
+    
+    model_config = ConfigDict(
+        env_prefix="VTTIRO_",
+        env_file=".env",
+        validate_assignment=True,
+        extra="forbid"  # Prevent unknown fields
+    )
+    
+    @field_validator('model')
     @classmethod
-    def load_from_file(cls, file_path: Union[str, Path]) -> 'VttiroConfig':
-        """Load configuration from YAML file."""
-        file_path = Path(file_path)
-        
-        if not file_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {file_path}")
+    def validate_model(cls, v, info):
+        """Validate model name for the selected engine."""
+        if v is not None:
+            # Get engine from context - info.data contains the parsed values
+            engine = info.data.get('engine', 'gemini')
+            if not engine and info.data.get('provider'):
+                engine = info.data.get('provider')
             
-        with open(file_path, 'r') as f:
-            data = yaml.safe_load(f)
+            # Define valid models per engine
+            valid_models = {
+                'gemini': [
+                    'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite',
+                    'gemini-2.0-flash', 'gemini-2.0-flash-lite'
+                ],
+                'openai': ['whisper-1', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe'],
+                'assemblyai': ['universal-2'],
+                'deepgram': ['nova-3']
+            }
             
-        return cls(**data)
+            if engine in valid_models and v not in valid_models[engine]:
+                valid_list = ', '.join(valid_models[engine])
+                raise ValueError(f"Invalid model '{v}' for engine '{engine}'. Valid models: {valid_list}")
         
-    def save_to_file(self, file_path: Union[str, Path]) -> None:
-        """Save configuration to YAML file."""
-        file_path = Path(file_path)
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(file_path, 'w') as f:
-            yaml.dump(self.dict(), f, default_flow_style=False, indent=2)
-            
+        return v
+    
+    @field_validator('full_prompt', 'prompt')
     @classmethod
-    def get_default_config_path(cls) -> Path:
-        """Get the default configuration file path."""
-        config_dir = Path.home() / ".vttiro"
-        config_dir.mkdir(exist_ok=True)
-        return config_dir / "config.yaml"
-        
+    def validate_prompt(cls, v):
+        """Validate prompt content."""
+        if v is not None:
+            # Basic validation - length limits and content sanitization
+            if len(v.strip()) == 0:
+                raise ValueError("Prompt cannot be empty or whitespace only")
+            if len(v) > 10000:  # Reasonable limit
+                raise ValueError("Prompt is too long (maximum 10,000 characters)")
+        return v
+    
+    @field_validator('language')
     @classmethod
-    def load_default(cls) -> 'VttiroConfig':
-        """Load configuration from default location or create new one."""
-        default_path = cls.get_default_config_path()
+    def validate_language_code(cls, v):
+        """Validate language code format."""
+        if v is not None and len(v) not in [2, 5]:  # ISO 639-1 or locale format
+            raise ValueError(f"Invalid language code format: {v}")
+        return v
+    
+    @field_validator('output_path')
+    @classmethod
+    def validate_output_path(cls, v):
+        """Validate output path."""
+        if v is not None:
+            v = Path(v)
+            # Ensure parent directory exists or can be created
+            v.parent.mkdir(parents=True, exist_ok=True)
+        return v
+    
+    def get_provider_config(self) -> dict[str, Any]:
+        """Get provider-specific configuration.
         
-        if default_path.exists():
-            return cls.load_from_file(default_path)
+        Returns:
+            Dictionary with provider-specific settings
+        """
+        # Use engine, fallback to provider for backward compatibility
+        current_engine = self.engine or self.provider or "gemini"
+        
+        config = {}
+        
+        # Use explicit model if provided, otherwise use engine-specific defaults
+        if self.model:
+            config["model"] = self.model
+        elif current_engine == "gemini":
+            config["model"] = self.gemini_model
+        elif current_engine == "openai":
+            config["model"] = self.openai_model
+        
+        return config
+    
+    def validate_effective_prompt(self, pattern: str = 'append') -> tuple[bool, str | None]:
+        """Validate the effective prompt length and content.
+        
+        Args:
+            pattern: How to combine prompts ('append', 'prepend', 'template')
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        try:
+            effective_prompt = self.get_effective_prompt(pattern)
+            
+            # Check length limits
+            if len(effective_prompt) > 15000:  # More generous limit for combined prompts
+                return False, f"Combined prompt is too long ({len(effective_prompt)} chars, max 15,000)"
+            
+            # Check for obviously problematic content
+            if not effective_prompt.strip():
+                return False, "Effective prompt is empty after processing"
+            
+            # Check for reasonable content (basic sanity check)
+            if len(effective_prompt.strip()) < 10:
+                return False, "Effective prompt is too short to be meaningful"
+            
+            return True, None
+            
+        except Exception as e:
+            return False, f"Error validating prompt: {str(e)}"
+    
+    def get_effective_prompt(self, pattern: str = 'append') -> str:
+        """Get the effective prompt based on full_prompt, prompt, and context.
+        
+        Args:
+            pattern: How to combine prompts ('append', 'prepend', 'template')
+            
+        Returns:
+            The resolved prompt to use
+        """
+        # Priority: full_prompt > prompt + default > context (legacy) > default
+        if self.full_prompt:
+            # Full prompt completely replaces default
+            return self.full_prompt.strip()
+        
+        elif self.prompt:
+            # Combine user prompt with default prompt using specified pattern
+            user_prompt = self.prompt.strip()
+            
+            if pattern in PROMPT_PATTERNS:
+                template = PROMPT_PATTERNS[pattern]
+                return template.format(
+                    default=DEFAULT_TRANSCRIPTION_PROMPT.strip(),
+                    user=user_prompt
+                ).strip()
+            else:
+                # Fallback to append pattern
+                return f"{DEFAULT_TRANSCRIPTION_PROMPT.strip()}\n\n{user_prompt}"
+        
+        elif self.context:
+            # Legacy context field - treat as appended prompt for backward compatibility
+            context_prompt = self.context.strip()
+            return f"{DEFAULT_TRANSCRIPTION_PROMPT.strip()}\n\n{context_prompt}"
+        
         else:
-            # Create default configuration
-            config = cls()
-            config.save_to_file(default_path)
-            return config
-            
-    def update_from_env(self) -> None:
-        """Update configuration from environment variables with VTTIRO_ prefix."""
-        # Update API keys from environment variables
-        if os.getenv("VTTIRO_GEMINI_API_KEY"):
-            self.transcription.gemini_api_key = os.getenv("VTTIRO_GEMINI_API_KEY")
-        if os.getenv("VTTIRO_ASSEMBLYAI_API_KEY"):
-            self.transcription.assemblyai_api_key = os.getenv("VTTIRO_ASSEMBLYAI_API_KEY")
-        if os.getenv("VTTIRO_DEEPGRAM_API_KEY"):
-            self.transcription.deepgram_api_key = os.getenv("VTTIRO_DEEPGRAM_API_KEY")
-        if os.getenv("VTTIRO_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY"):
-            # Support both VTTIRO_ prefix and standard OPENAI_API_KEY
-            self.transcription.openai_api_key = os.getenv("VTTIRO_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-        
-        # Update model preference
-        if os.getenv("VTTIRO_MODEL"):
-            self.transcription.preferred_model = os.getenv("VTTIRO_MODEL")
-        
-        # Update processing settings
-        if os.getenv("VTTIRO_CHUNK_DURATION"):
-            try:
-                self.processing.chunk_duration = int(os.getenv("VTTIRO_CHUNK_DURATION"))
-            except ValueError:
-                pass  # Keep default if invalid
-        
-        # Legacy support for non-prefixed variables (for backwards compatibility)
-        if os.getenv("GEMINI_API_KEY") and not self.transcription.gemini_api_key:
-            self.transcription.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        if os.getenv("ASSEMBLYAI_API_KEY") and not self.transcription.assemblyai_api_key:
-            self.transcription.assemblyai_api_key = os.getenv("ASSEMBLYAI_API_KEY")
-        if os.getenv("DEEPGRAM_API_KEY") and not self.transcription.deepgram_api_key:
-            self.transcription.deepgram_api_key = os.getenv("DEEPGRAM_API_KEY")
-
-
-@dataclass
-class TranscriptionResult:
-    """Result of transcription processing."""
+            # No custom prompt provided, use default
+            return DEFAULT_TRANSCRIPTION_PROMPT.strip()
     
-    text: str
-    confidence: float
-    word_timestamps: List[Dict[str, Any]]
-    processing_time: float
-    model_name: str
-    start_time: float = 0.0  # Start time in seconds for the segment
-    end_time: float = 0.0    # End time in seconds for the segment
-    language: Optional[str] = None
-    speaker_segments: Optional[List[Dict[str, Any]]] = None
-    emotions: Optional[List[Dict[str, Any]]] = None
-    metadata: Optional[Dict[str, Any]] = None
-    raw_response: Optional[Any] = None  # Complete raw AI model output for --raw mode
+    def to_dict(self) -> dict[str, Any]:
+        """Convert configuration to dictionary.
+        
+        Returns:
+            Configuration as dictionary with resolved paths
+        """
+        data = self.model_dump()
+        # Convert Path objects to strings for serialization
+        if data.get("output_path"):
+            data["output_path"] = str(data["output_path"])
+        return data
+    
+    @classmethod
+    def from_file(cls, config_path: Path) -> "VttiroConfig":
+        """Load configuration from file.
+        
+        Args:
+            config_path: Path to configuration file (JSON or YAML)
+            
+        Returns:
+            VttiroConfig instance
+            
+        Raises:
+            FileNotFoundError: Configuration file not found
+            ValueError: Invalid configuration format
+        """
+        if not config_path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+        
+        import json
+        
+        if config_path.suffix.lower() == ".json":
+            with open(config_path) as f:
+                data = json.load(f)
+        else:
+            # Try YAML if available
+            try:
+                import yaml
+                with open(config_path) as f:
+                    data = yaml.safe_load(f)
+            except ImportError:
+                raise ValueError(
+                    f"YAML support not available. Install with: pip install pyyaml"
+                )
+        
+        return cls(**data)

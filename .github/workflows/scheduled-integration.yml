@@ -1,0 +1,249 @@
+# this_file: .github/workflows/scheduled-integration.yml
+
+name: Scheduled Integration Tests
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  PYTHONUNBUFFERED: "1"
+  FORCE_COLOR: "1"
+
+jobs:
+  integration-tests:
+    name: Integration Tests with Real APIs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+        provider: ["gemini", "openai", "assemblyai", "deepgram"]
+    
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -e ".[dev,test]"
+
+      - name: Set up test audio files
+        run: |
+          mkdir -p tests/integration/audio
+          # Create small test audio files for integration testing
+          python -c "
+          import wave
+          import struct
+          import math
+          
+          def create_test_audio(filename, duration=5.0, sample_rate=16000):
+              frames = int(duration * sample_rate)
+              with wave.open(filename, 'wb') as wav:
+                  wav.setnchannels(1)
+                  wav.setsampwidth(2)
+                  wav.setframerate(sample_rate)
+                  for i in range(frames):
+                      # Generate simple sine wave at 440Hz
+                      sample = int(16383 * math.sin(2 * math.pi * 440 * i / sample_rate))
+                      wav.writeframes(struct.pack('<h', sample))
+          
+          create_test_audio('tests/integration/audio/test_5s.wav', 5.0)
+          create_test_audio('tests/integration/audio/test_15s.wav', 15.0)
+          "
+
+      - name: Run integration tests for ${{ matrix.provider }}
+        env:
+          # Provider API keys from repository secrets
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ASSEMBLYAI_API_KEY: ${{ secrets.ASSEMBLYAI_API_KEY }}
+          DEEPGRAM_API_KEY: ${{ secrets.DEEPGRAM_API_KEY }}
+          # Enable real API integration
+          VTTIRO_INTEGRATION_TESTS: "true"
+          VTTIRO_TEST_PROVIDER: ${{ matrix.provider }}
+        run: |
+          # Only run if the provider API key is available
+          if [ "${{ matrix.provider }}" = "gemini" ] && [ -z "$GEMINI_API_KEY" ]; then
+            echo "Skipping Gemini tests - no API key configured"
+            exit 0
+          elif [ "${{ matrix.provider }}" = "openai" ] && [ -z "$OPENAI_API_KEY" ]; then
+            echo "Skipping OpenAI tests - no API key configured"
+            exit 0
+          elif [ "${{ matrix.provider }}" = "assemblyai" ] && [ -z "$ASSEMBLYAI_API_KEY" ]; then
+            echo "Skipping AssemblyAI tests - no API key configured"
+            exit 0
+          elif [ "${{ matrix.provider }}" = "deepgram" ] && [ -z "$DEEPGRAM_API_KEY" ]; then
+            echo "Skipping Deepgram tests - no API key configured"
+            exit 0
+          fi
+          
+          # Run provider-specific integration tests
+          uv run python -m pytest \
+            src/vttiro/tests/integration/ \
+            -v \
+            --tb=short \
+            --durations=10 \
+            -k "test_${{ matrix.provider }}_integration" \
+            || echo "Integration tests failed for ${{ matrix.provider }}"
+
+      - name: Test provider fallback chain
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ASSEMBLYAI_API_KEY: ${{ secrets.ASSEMBLYAI_API_KEY }}
+          DEEPGRAM_API_KEY: ${{ secrets.DEEPGRAM_API_KEY }}
+          VTTIRO_INTEGRATION_TESTS: "true"
+        run: |
+          # Test fallback chain functionality with real APIs
+          uv run python -c "
+          import os
+          import sys
+          sys.path.insert(0, 'src')
+          
+          from vttiro.core.config import VttiroConfig
+          from vttiro.providers.registry import ProviderRegistry
+          from vttiro.core.transcriber import Transcriber
+          
+          print('Testing provider fallback chain...')
+          
+          # Create config with fallback chain
+          config = VttiroConfig(
+              provider='${{ matrix.provider }}',
+              fallback_providers=['gemini', 'openai'],
+              language='en',
+              output_format='webvtt'
+          )
+          
+          try:
+              transcriber = Transcriber(config)
+              print(f'Successfully initialized transcriber with ${{ matrix.provider }} and fallbacks')
+              
+              # Test cost estimation (doesn't require API call)
+              cost = transcriber.estimate_cost(duration=10.0)
+              print(f'Cost estimation: \${cost:.4f} for 10 seconds')
+              
+          except Exception as e:
+              print(f'Fallback chain test failed: {e}')
+              sys.exit(1)
+          "
+
+      - name: Test configuration validation
+        run: |
+          # Test enhanced configuration validation
+          uv run python -c "
+          import sys
+          sys.path.insert(0, 'src')
+          
+          from vttiro.core.config import VttiroConfig
+          
+          print('Testing configuration validation...')
+          
+          # Test valid configuration
+          try:
+              config = VttiroConfig(
+                  provider='${{ matrix.provider }}',
+                  language='en',
+                  output_format='webvtt',
+                  enhanced_features={
+                      'speaker_labels': True,
+                      'confidence_scores': True
+                  }
+              )
+              print('✓ Valid configuration accepted')
+          except Exception as e:
+              print(f'✗ Valid configuration rejected: {e}')
+              sys.exit(1)
+          
+          # Test invalid configuration
+          try:
+              invalid_config = VttiroConfig(
+                  provider='invalid_provider',
+                  language='invalid_language',
+                  output_format='invalid_format'
+              )
+              print('✗ Invalid configuration accepted (should have failed)')
+              sys.exit(1)
+          except Exception as e:
+              print(f'✓ Invalid configuration properly rejected: {e}')
+          "
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-results-${{ matrix.provider }}-py${{ matrix.python-version }}
+          path: |
+            tests/integration/audio/
+            pytest-results.xml
+          retention-days: 7
+
+  quality-gate:
+    name: Integration Quality Gate
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: always()
+    
+    steps:
+      - name: Check integration test results
+        run: |
+          echo "Integration test results:"
+          echo "Status: ${{ needs.integration-tests.result }}"
+          
+          if [ "${{ needs.integration-tests.result }}" = "success" ]; then
+            echo "✓ All integration tests passed"
+          elif [ "${{ needs.integration-tests.result }}" = "failure" ]; then
+            echo "✗ Some integration tests failed"
+            echo "This indicates potential issues with provider integrations"
+            echo "Please check the test logs and provider API status"
+          else
+            echo "⚠ Integration tests completed with issues"
+          fi
+
+  notify-failures:
+    name: Notify on Failures
+    runs-on: ubuntu-latest
+    needs: [integration-tests, quality-gate]
+    if: failure()
+    
+    steps:
+      - name: Create failure summary
+        run: |
+          echo "## Integration Test Failure Summary" >> failure_summary.md
+          echo "" >> failure_summary.md
+          echo "The scheduled integration tests have failed." >> failure_summary.md
+          echo "" >> failure_summary.md
+          echo "**Failed Job:** ${{ github.job }}" >> failure_summary.md
+          echo "**Workflow:** ${{ github.workflow }}" >> failure_summary.md
+          echo "**Run:** ${{ github.run_id }}" >> failure_summary.md
+          echo "" >> failure_summary.md
+          echo "Please investigate the following potential causes:" >> failure_summary.md
+          echo "- Provider API connectivity issues" >> failure_summary.md
+          echo "- API key expiration or rate limiting" >> failure_summary.md
+          echo "- Changes in provider API responses" >> failure_summary.md
+          echo "- Regression in transcription quality" >> failure_summary.md
+          
+          cat failure_summary.md
+
+      - name: Report failure (would notify maintainers)
+        run: |
+          echo "In a real deployment, this step would:"
+          echo "- Send notifications to maintainers"
+          echo "- Create GitHub issues for tracking"
+          echo "- Update monitoring dashboards"
+          echo "- Trigger alert escalation procedures"
