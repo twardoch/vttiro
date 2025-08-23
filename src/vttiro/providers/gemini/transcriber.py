@@ -19,6 +19,7 @@ from typing import Any
 
 from loguru import logger
 
+from vttiro.core.constants import GEMINI_MAX_FILE_SIZE_MB, WEBVTT_DEFAULT_CONFIDENCE
 from vttiro.core.errors import (
     APIError,
     AuthenticationError,
@@ -28,6 +29,9 @@ from vttiro.core.errors import (
     handle_provider_exception,
 )
 from vttiro.core.types import TranscriptionResult, TranscriptSegment
+
+# Removed complex type validation - using simple validation in base class
+from vttiro.providers.base import TranscriberABC
 from vttiro.utils.api_keys import get_api_key_with_fallbacks
 from vttiro.utils.logging import log_performance, log_provider_debug
 from vttiro.utils.prompt import build_webvtt_prompt, optimize_prompt_for_provider
@@ -35,9 +39,6 @@ from vttiro.utils.timestamp import (
     distribute_words_over_duration,
     parse_webvtt_timestamp_line,
 )
-
-# Removed complex type validation - using simple validation in base class
-from vttiro.providers.base import TranscriberABC
 
 # Optional dependency handling
 try:
@@ -85,33 +86,33 @@ class GeminiTranscriber(TranscriberABC):
             AuthenticationError: If API key is missing or invalid
         """
         if not GEMINI_AVAILABLE:
-            raise ImportError(
-                "Google GenerativeAI not available. Install with: uv add google-generativeai"
-            )
+            msg = "Google GenerativeAI not available. Install with: uv add google-generativeai"
+            raise ImportError(msg)
 
         # Handle both config object and direct api_key parameter
         api_key = None
         if config_or_api_key is not None:
-            if hasattr(config_or_api_key, 'transcription'):
+            if hasattr(config_or_api_key, "engine"):
                 # It's a VttiroConfig object
                 # Extract model from config if not explicitly set
                 if model == "gemini-2.5-flash":  # default value
-                    model = getattr(config_or_api_key.transcription, 'gemini_model', 'gemini-2.5-flash')
+                    model = getattr(config_or_api_key, "gemini_model", "gemini-2.5-flash")
+                # No API key extraction from config - always use environment variables
+                api_key = None
             else:
                 # It's an API key string
                 api_key = config_or_api_key
 
         # Get API key from parameter or environment with fallbacks
         self.api_key = get_api_key_with_fallbacks("gemini", api_key)
-        logger.debug(f"DEBUG: config_or_api_key type: {type(config_or_api_key)}")
-        logger.debug(f"DEBUG: config_or_api_key content: {str(config_or_api_key)[:200]}...")
-        logger.debug(f"DEBUG: resolved api_key: {api_key}")
-        logger.debug(f"DEBUG: final self.api_key: {self.api_key[:20] if self.api_key else None}...")
         if not self.api_key:
-            raise AuthenticationError(
+            msg = (
                 "Gemini API key not provided. Set one of: VTTIRO_GEMINI_API_KEY, "
                 "GEMINI_API_KEY, GOOGLE_API_KEY environment variables "
-                "or pass api_key parameter.",
+                "or pass api_key parameter."
+            )
+            raise AuthenticationError(
+                msg,
                 provider="gemini",
             )
 
@@ -144,7 +145,7 @@ class GeminiTranscriber(TranscriberABC):
     @property
     def max_file_size_mb(self) -> int:
         """Maximum file size in MB."""
-        return 20  # Gemini limit
+        return GEMINI_MAX_FILE_SIZE_MB
 
     @property
     def supports_speaker_diarization(self) -> bool:
@@ -171,13 +172,13 @@ class GeminiTranscriber(TranscriberABC):
         try:
             # Validate file
             if not audio_path.exists():
-                raise ProcessingError(f"Audio file not found: {audio_path}")
+                msg = f"Audio file not found: {audio_path}"
+                raise ProcessingError(msg)
 
             file_size_mb = audio_path.stat().st_size / (1024 * 1024)
             if file_size_mb > self.max_file_size_mb:
-                raise ProcessingError(
-                    f"File too large: {file_size_mb:.1f}MB > {self.max_file_size_mb}MB"
-                )
+                msg = f"File too large: {file_size_mb:.1f}MB > {self.max_file_size_mb}MB"
+                raise ProcessingError(msg)
 
             log_provider_debug(
                 "gemini",
@@ -208,7 +209,8 @@ class GeminiTranscriber(TranscriberABC):
                 audio_file = genai.get_file(audio_file.name)
 
             if audio_file.state.name != "ACTIVE":
-                raise ProcessingError(f"File upload failed: {audio_file.state.name}")
+                msg = f"File upload failed: {audio_file.state.name}"
+                raise ProcessingError(msg)
 
             logger.debug("Sending transcription request to Gemini")
 
@@ -246,21 +248,19 @@ class GeminiTranscriber(TranscriberABC):
                 if hasattr(response, "prompt_feedback"):
                     feedback = response.prompt_feedback
                     if feedback.block_reason:
+                        msg = f"Content blocked by safety filters: {feedback.block_reason}"
                         raise ContentFilterError(
-                            f"Content blocked by safety filters: {feedback.block_reason}",
+                            msg,
                             provider="gemini",
                             filter_type=str(feedback.block_reason),
                         )
 
-                raise ProcessingError(
-                    "Empty response from Gemini (possible content filtering)"
-                )
+                msg = "Empty response from Gemini (possible content filtering)"
+                raise ProcessingError(msg)
 
             # Parse WebVTT response
             webvtt_content = response.text.strip()
-            log_provider_debug(
-                "gemini", "response_received", {"response_length": len(webvtt_content)}
-            )
+            log_provider_debug("gemini", "response_received", {"response_length": len(webvtt_content)})
 
             # Parse segments from WebVTT
             segments = self._parse_webvtt_response(webvtt_content, audio_path)
@@ -269,22 +269,22 @@ class GeminiTranscriber(TranscriberABC):
             log_performance(
                 operation="gemini_transcription",
                 duration=processing_time,
-                file_size_mb=file_size_mb,
-                segments_count=len(segments),
+                metrics={
+                    "file_size_mb": file_size_mb,
+                    "segments_count": len(segments),
+                },
             )
 
             return TranscriptionResult(
                 segments=segments,
+                provider="gemini",
                 language=kwargs.get("language", "auto"),
-                confidence=0.9,  # Gemini typically has high confidence
-                processing_time=processing_time,
+                confidence=WEBVTT_DEFAULT_CONFIDENCE,
                 metadata={
-                    "provider": "gemini",
                     "model": self.model,
                     "file_size_mb": file_size_mb,
-                    "raw_response": (
-                        webvtt_content[:1000] if kwargs.get("debug") else None
-                    ),
+                    "processing_time": processing_time,
+                    "raw_response": (webvtt_content[:1000] if kwargs.get("debug") else None),
                 },
             )
 
@@ -297,9 +297,7 @@ class GeminiTranscriber(TranscriberABC):
             )
             raise handle_provider_exception(e, "gemini", context) from e
 
-    def _parse_webvtt_response(
-        self, webvtt_text: str, audio_path: Path
-    ) -> list[TranscriptSegment]:
+    def _parse_webvtt_response(self, webvtt_text: str, audio_path: Path) -> list[TranscriptSegment]:
         """Parse WebVTT format response into segments.
 
         Args:
@@ -344,25 +342,20 @@ class GeminiTranscriber(TranscriberABC):
 
                         # Extract speaker info if present (e.g., "Speaker 1: Hello")
                         speaker = None
-                        if ":" in text and text.split(":", 1)[
-                            0
-                        ].strip().lower().startswith("speaker"):
+                        if ":" in text and text.split(":", 1)[0].strip().lower().startswith("speaker"):
                             speaker_part, text = text.split(":", 1)
                             speaker = speaker_part.strip()
                             text = text.strip()
 
                         # Distribute words over duration for word-level timing
-                        words = distribute_words_over_duration(
-                            text, start_time, end_time
-                        )
+                        distribute_words_over_duration(text, start_time, end_time)
 
                         segment = TranscriptSegment(
                             start=start_time,
                             end=end_time,
                             text=text,
-                            confidence=0.9,
+                            confidence=WEBVTT_DEFAULT_CONFIDENCE,
                             speaker=speaker,
-                            words=words,
                         )
                         segments.append(segment)
 

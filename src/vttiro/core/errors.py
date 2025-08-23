@@ -117,7 +117,7 @@ class ContentFilterError(VttiroError):
     def __init__(self, message: str, provider: str, details: dict | None = None):
         self.provider = provider
         error_code = f"CONTENT_FILTERED_{provider.upper()}"
-        
+
         guidance = f"Content was rejected by {provider} safety filters. Try rephrasing input or use different provider."
         super().__init__(message, error_code, details, guidance)
 
@@ -165,6 +165,28 @@ class TranscriptionError(VttiroError):
         error_code = "TRANSCRIPTION_FAILED"
 
         guidance = f"Transcription failed after {attempts}/{max_retries} attempts. Try different provider or check network connectivity."
+        super().__init__(message, error_code, details, guidance)
+
+
+class OutputGenerationError(VttiroError):
+    """Error during output file generation (WebVTT, SRT, etc.)."""
+
+    def __init__(
+        self, 
+        message: str, 
+        output_format: str | None = None, 
+        output_path: str | None = None, 
+        details: dict | None = None
+    ):
+        self.output_format = output_format
+        self.output_path = output_path
+        error_code = f"OUTPUT_{output_format.upper()}" if output_format else "OUTPUT_GENERATION"
+
+        guidance = "Check output directory permissions and file format settings. Ensure target directory exists and is writable."
+        if output_path:
+            details = details or {}
+            details["output_path"] = output_path
+
         super().__init__(message, error_code, details, guidance)
 
 

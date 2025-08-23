@@ -8,9 +8,7 @@ Focus: Generate clean WebVTT files with timestamps and speaker labels.
 """
 
 from dataclasses import dataclass
-from typing import Optional
-
-from vttiro.core.types import TranscriptionResult, TranscriptSegment
+from vttiro.core.types import TranscriptionResult
 
 
 @dataclass

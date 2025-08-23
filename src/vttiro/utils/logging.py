@@ -16,6 +16,7 @@ import sys
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from collections.abc import Iterator
 from typing import Any
 
 import psutil
@@ -128,7 +129,7 @@ def log_provider_debug(provider: str, operation: str, details: dict[str, Any], s
 
 
 @contextmanager
-def log_timing(operation: str, details: dict[str, Any] | None = None):
+def log_timing(operation: str, details: dict[str, Any] | None = None) -> Iterator[None]:
     """Context manager for timing operations with automatic logging.
 
     Args:

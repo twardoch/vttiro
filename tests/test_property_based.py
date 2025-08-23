@@ -3,11 +3,8 @@
 """Property-based tests using Hypothesis for edge case discovery."""
 
 import string
-import tempfile
-from pathlib import Path
-
 import pytest
-from hypothesis import assume, example, given, settings
+from hypothesis import example, given
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, RuleBasedStateMachine, initialize, invariant, rule
 
@@ -244,8 +241,7 @@ class TestStatefulTranscriberBehavior(RuleBasedStateMachine):
     @rule(target=configs)
     def create_config(self):
         """Create a configuration."""
-        config = VttiroConfig()
-        return config
+        return VttiroConfig()
 
     @rule(target=sources, duration=st.integers(min_value=30, max_value=3600))
     def create_source(self, duration):
@@ -261,7 +257,8 @@ class TestStatefulTranscriberBehavior(RuleBasedStateMachine):
 
             # Simulate occasional failures
             if self.transcription_count % 7 == 0:  # Fail every 7th attempt
-                raise ValidationError("Simulated validation error")
+                msg = "Simulated validation error"
+                raise ValidationError(msg)
 
         except Exception as e:
             self.errors_encountered.append(type(e).__name__)

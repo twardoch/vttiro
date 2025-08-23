@@ -14,6 +14,8 @@ Used by:
 import re
 from typing import Any
 
+from vttiro.core.constants import MAX_TIMESTAMP_PARTS, MILLISECOND_PRECISION, MIN_TIMESTAMP_PARTS
+
 try:
     from loguru import logger
 except ImportError:
@@ -55,7 +57,7 @@ def parse_timestamp(timestamp_str: str) -> float:
         # Split by colon to handle different formats
         parts = timestamp_str.split(":")
 
-        if len(parts) == 3:
+        if len(parts) == MAX_TIMESTAMP_PARTS:
             # HH:MM:SS.mmm or HH:MM:SSS format
             hours = int(parts[0])
             minutes = int(parts[1])
@@ -72,17 +74,17 @@ def parse_timestamp(timestamp_str: str) -> float:
             else:
                 # Malformed format: handle as special case for Gemini-style timestamps
                 raw_number = int(seconds_part)
-                if raw_number >= 100:
+                if raw_number >= MILLISECOND_PRECISION:
                     # For numbers like 700, interpret as tenths: 700 -> 0.7 seconds
                     # This handles cases like "00:05:700" -> 5.7 total seconds
-                    seconds = raw_number // 100  # First digit(s) as seconds
-                    milliseconds = (raw_number % 100) * 10  # Remaining as milliseconds
+                    seconds = raw_number // MILLISECOND_PRECISION  # First digit(s) as seconds
+                    milliseconds = (raw_number % MILLISECOND_PRECISION) * 10  # Remaining as milliseconds
                 else:
                     # Small number, treat as seconds
                     seconds = raw_number
                     milliseconds = 0
 
-        elif len(parts) == 2:
+        elif len(parts) == MIN_TIMESTAMP_PARTS:
             # MM:SS.mmm or MM:SSS format
             hours = 0
             minutes = int(parts[0])
@@ -96,9 +98,9 @@ def parse_timestamp(timestamp_str: str) -> float:
             else:
                 # Handle MM:SSS format
                 raw_number = int(seconds_part)
-                if raw_number >= 100:
-                    seconds = raw_number // 100
-                    milliseconds = (raw_number % 100) * 10
+                if raw_number >= MILLISECOND_PRECISION:
+                    seconds = raw_number // MILLISECOND_PRECISION
+                    milliseconds = (raw_number % MILLISECOND_PRECISION) * 10
                 else:
                     seconds = raw_number
                     milliseconds = 0
@@ -118,7 +120,8 @@ def parse_timestamp(timestamp_str: str) -> float:
                 seconds = int(timestamp_str)
                 milliseconds = 0
         else:
-            raise ValueError(f"Unexpected timestamp format: '{timestamp_str}'")
+            msg = f"Unexpected timestamp format: '{timestamp_str}'"
+            raise ValueError(msg)
 
         # Calculate total seconds
         total_seconds = hours * 3600 + minutes * 60 + seconds + milliseconds / 1000.0
@@ -129,9 +132,10 @@ def parse_timestamp(timestamp_str: str) -> float:
     except (ValueError, IndexError) as e:
         try:
             logger.warning(f"Failed to parse timestamp '{timestamp_str}': {e}")
-        except:
-            pass  # Ignore logging errors
-        raise ValueError(f"Invalid timestamp format: '{timestamp_str}'") from e
+        except Exception:
+            pass  # Ignore logging errors to avoid masking the original parsing error
+        msg = f"Invalid timestamp format: '{timestamp_str}'"
+        raise ValueError(msg) from e
 
 
 def format_timestamp(seconds: float, format_type: str = "webvtt") -> str:
@@ -151,7 +155,8 @@ def format_timestamp(seconds: float, format_type: str = "webvtt") -> str:
         "5:30.25"
     """
     if seconds < 0:
-        raise ValueError("Timestamp cannot be negative")
+        msg = "Timestamp cannot be negative"
+        raise ValueError(msg)
 
     # Extract components
     hours = int(seconds // 3600)
@@ -169,7 +174,8 @@ def format_timestamp(seconds: float, format_type: str = "webvtt") -> str:
         if hours > 0:
             return f"{hours}:{minutes:02d}:{secs:04.1f}"
         return f"{minutes}:{secs:04.1f}"
-    raise ValueError(f"Unknown format type: {format_type}")
+    msg = f"Unknown format type: {format_type}"
+    raise ValueError(msg)
 
 
 def parse_webvtt_timestamp_line(line: str) -> tuple[float, float] | None:

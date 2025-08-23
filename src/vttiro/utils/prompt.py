@@ -39,11 +39,13 @@ def build_webvtt_prompt(
     """
     # Base prompt with clear WebVTT format requirements
     prompt_parts = [
-        "TRANSCRIPTION TASK: Perform “clean verbatim” (“intelligent verbatim”) transcription of the provided audio into WebVTT subtitle format with intelligent timestamps.",
+        'TRANSCRIPTION TASK: Perform "clean verbatim" ("intelligent verbatim") '
+        "transcription of the provided audio into WebVTT subtitle format with intelligent timestamps.",
         "",
         "STRICT OUTPUT FORMAT REQUIREMENTS:",
         "1. Start with 'WEBVTT' header",
-        "2. In the WebVTT header, always indicate the language code, based on the supplied language info or on your own recognition.",
+        "2. In the WebVTT header, always indicate the language code, based on "
+        "the supplied language info or on your own recognition.",
         "3. Use precise timestamps in HH:MM:SS.mmm format",
         "4. Each subtitle segment should have:",
         "   - Timestamp line: start_time --> end_time",

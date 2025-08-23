@@ -64,19 +64,13 @@ class VttiroConfig(BaseModel):
     )
 
     # Model Selection
-    model: str | None = Field(
-        default=None, description="Specific model to use for the selected engine"
-    )
+    model: str | None = Field(default=None, description="Specific model to use for the selected engine")
 
     # Language and Content
-    language: str | None = Field(
-        default=None, description="Language code (ISO 639-1) or None for auto-detection"
-    )
+    language: str | None = Field(default=None, description="Language code (ISO 639-1) or None for auto-detection")
 
     # Prompt Configuration (replaces context)
-    full_prompt: str | None = Field(
-        default=None, description="Complete replacement for the default built-in prompt"
-    )
+    full_prompt: str | None = Field(default=None, description="Complete replacement for the default built-in prompt")
 
     prompt: str | None = Field(
         default=None,
@@ -94,18 +88,12 @@ class VttiroConfig(BaseModel):
         default="webvtt", description="Output format for transcription results"
     )
 
-    output_path: Path | None = Field(
-        default=None, description="Output file path, None for auto-generation"
-    )
+    output_path: Path | None = Field(default=None, description="Output file path, None for auto-generation")
 
     # Processing Options
-    enable_speaker_diarization: bool = Field(
-        default=False, description="Enable speaker identification when supported"
-    )
+    enable_speaker_diarization: bool = Field(default=False, description="Enable speaker identification when supported")
 
-    enable_emotion_detection: bool = Field(
-        default=False, description="Enable emotion detection when supported"
-    )
+    enable_emotion_detection: bool = Field(default=False, description="Enable emotion detection when supported")
 
     # Audio Processing
     audio_preprocessing: bool = Field(
@@ -121,31 +109,19 @@ class VttiroConfig(BaseModel):
     )
 
     # Provider-Specific Settings
-    gemini_model: str = Field(
-        default="gemini-2.5-flash", description="Gemini model to use for transcription"
-    )
+    gemini_model: str = Field(default="gemini-2.5-flash", description="Gemini model to use for transcription")
 
-    openai_model: str = Field(
-        default="gpt-4o-transcribe", description="OpenAI model to use for transcription"
-    )
+    openai_model: str = Field(default="gpt-4o-transcribe", description="OpenAI model to use for transcription")
 
     # Performance and Reliability
-    timeout_seconds: float = Field(
-        default=300.0, gt=0, description="Request timeout in seconds"
-    )
+    timeout_seconds: float = Field(default=300.0, gt=0, description="Request timeout in seconds")
 
-    max_retries: int = Field(
-        default=3, ge=0, le=10, description="Maximum number of retry attempts"
-    )
+    max_retries: int = Field(default=3, ge=0, le=10, description="Maximum number of retry attempts")
 
     # Development and Debugging
-    verbose: bool = Field(
-        default=False, description="Enable verbose logging and debug output"
-    )
+    verbose: bool = Field(default=False, description="Enable verbose logging and debug output")
 
-    debug: bool = Field(
-        default=False, description="Enable debug mode (preserve working directories)"
-    )
+    debug: bool = Field(default=False, description="Enable debug mode (preserve working directories)")
 
     dry_run: bool = Field(
         default=False,
@@ -170,9 +146,7 @@ class VttiroConfig(BaseModel):
         description="Number of failures before triggering legacy fallback",
     )
 
-    model_config = ConfigDict(
-        env_prefix="VTTIRO_", env_file=".env", validate_assignment=True, extra="forbid"
-    )
+    model_config = ConfigDict(env_prefix="VTTIRO_", env_file=".env", validate_assignment=True, extra="forbid")
 
     def get_provider_config(self) -> dict[str, Any]:
         """Get provider-specific configuration.
@@ -215,9 +189,7 @@ class VttiroConfig(BaseModel):
 
             if pattern in PROMPT_PATTERNS:
                 template = PROMPT_PATTERNS[pattern]
-                return template.format(
-                    default=DEFAULT_TRANSCRIPTION_PROMPT.strip(), user=user_prompt
-                ).strip()
+                return template.format(default=DEFAULT_TRANSCRIPTION_PROMPT.strip(), user=user_prompt).strip()
             # Fallback to append pattern
             return f"{DEFAULT_TRANSCRIPTION_PROMPT.strip()}\n\n{user_prompt}"
 
@@ -256,7 +228,8 @@ class VttiroConfig(BaseModel):
             ValueError: Invalid configuration format
         """
         if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+            msg = f"Configuration file not found: {config_path}"
+            raise FileNotFoundError(msg)
 
         import json
 
@@ -270,16 +243,13 @@ class VttiroConfig(BaseModel):
 
                 with open(config_path) as f:
                     data = yaml.safe_load(f)
-            except ImportError:
-                raise ValueError(
-                    "YAML support not available. Install with: pip install pyyaml"
-                )
+            except ImportError as e:
+                msg = "YAML support not available. Install with: pip install pyyaml"
+                raise ValueError(msg) from e
 
         return cls(**data)
 
-    def to_file(
-        self, config_path: Path, format: Literal["json", "yaml"] = "yaml"
-    ) -> None:
+    def to_file(self, config_path: Path, format: Literal["json", "yaml"] = "yaml") -> None:
         """Save configuration to file.
 
         Args:
@@ -305,9 +275,9 @@ class VttiroConfig(BaseModel):
             try:
                 with open(config_path, "w") as f:
                     yaml.dump(clean_data, f, default_flow_style=False, indent=2)
-            except NameError:
-                raise ValueError(
-                    "YAML support not available. Install with: pip install pyyaml"
-                )
+            except NameError as e:
+                msg = "YAML support not available. Install with: pip install pyyaml"
+                raise ValueError(msg) from e
         else:
-            raise ValueError(f"Unsupported format: {format}. Use 'json' or 'yaml'")
+            msg = f"Unsupported format: {format}. Use 'json' or 'yaml'"
+            raise ValueError(msg)

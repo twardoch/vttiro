@@ -26,6 +26,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import psutil
 from loguru import logger
 
+from vttiro.core.constants import (
+    LARGE_FILE_SIZE_MB,
+    MEMORY_CRITICAL_THRESHOLD,
+    MEMORY_HIGH_USAGE_THRESHOLD,
+    MIN_AUDIO_DURATION,
+)
 from vttiro.core.errors import ProcessingError, create_debug_context
 
 # Memory management constants
@@ -68,7 +74,7 @@ class MemoryManager:
         """Check if memory usage is approaching limits."""
         stats = self.get_memory_usage()
 
-        if stats["system_percent"] > 85:
+        if stats["system_percent"] > MEMORY_HIGH_USAGE_THRESHOLD:
             return True, f"System memory usage high: {stats['system_percent']:.1f}%"
 
         if stats["process_mb"] > stats["memory_limit_mb"]:
@@ -80,15 +86,13 @@ class MemoryManager:
         """Suggest memory optimization strategies."""
         stats = self.get_memory_usage()
 
-        suggestions = {
+        return {
             "use_streaming": file_size_mb > MEMORY_LIMITS["streaming_threshold"] / (1024 * 1024),
-            "reduce_chunk_size": stats["system_percent"] > 70,
+            "reduce_chunk_size": stats["system_percent"] > MEMORY_CRITICAL_THRESHOLD,
             "enable_cleanup": file_size_mb > MEMORY_LIMITS["cleanup_threshold"] / (1024 * 1024),
-            "parallel_processing": stats["system_available_mb"] > 1000,
+            "parallel_processing": stats["system_available_mb"] > LARGE_FILE_SIZE_MB,
             "current_stats": stats,
         }
-
-        return suggestions
 
 
 class ProgressTracker:
@@ -101,7 +105,7 @@ class ProgressTracker:
         self.description = description
         self.last_update = 0
 
-    def update(self, work_done: int, message: str | None = None):
+    def update(self, work_done: int, message: str | None = None) -> None:
         """Update progress and log if significant change."""
         self.completed_work = min(work_done, self.total_work)
 
@@ -109,7 +113,7 @@ class ProgressTracker:
         current_time = time.time()
         progress_percent = (self.completed_work / self.total_work) * 100
 
-        if current_time - self.last_update > 5.0 or progress_percent - (self.last_update * 100) >= 5:
+        if current_time - self.last_update > MIN_AUDIO_DURATION or progress_percent - (self.last_update * 100) >= 5:
             eta = self._calculate_eta()
             logger.info(f"{self.description}: {progress_percent:.1f}% complete{eta}")
             if message:
@@ -142,10 +146,10 @@ class AudioProcessor:
         self.temp_directories = []
         self.executor = ThreadPoolExecutor(max_workers=2)  # Conservative threading
 
-    def __enter__(self):
+    def __enter__(self) -> "AudioProcessor":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.cleanup_all()
         self.executor.shutdown(wait=True)
 
@@ -199,12 +203,13 @@ class AudioProcessor:
         except Exception as e:
             # Cleanup on failure
             await self._cleanup_directory(working_dir)
+            msg = f"Audio processing failed: {e}"
             raise ProcessingError(
-                f"Audio processing failed: {e}",
+                msg,
                 file_path=str(file_path),
                 stage="audio_processing",
                 details=create_debug_context(str(file_path), error=str(e)),
-            )
+            ) from e
 
     def _create_working_directory(self, file_path: Path, output_name: str | None = None) -> Path:
         """Create optimized working directory with cleanup tracking."""
@@ -259,17 +264,17 @@ class AudioProcessor:
             await self._run_ffmpeg_with_progress(cmd, progress_callback)
 
             if not output_path.exists() or output_path.stat().st_size == 0:
-                raise ProcessingError(
-                    "Audio extraction produced no output", file_path=str(file_path), stage="audio_extraction"
-                )
+                msg = "Audio extraction produced no output"
+                raise ProcessingError(msg, file_path=str(file_path), stage="audio_extraction")
 
             logger.info(f"Audio extracted: {output_path} ({output_path.stat().st_size / (1024 * 1024):.1f}MB)")
             return output_path
 
         except subprocess.CalledProcessError as e:
-            raise ProcessingError(f"FFmpeg extraction failed: {e}", file_path=str(file_path), stage="audio_extraction")
+            msg = f"FFmpeg extraction failed: {e}"
+            raise ProcessingError(msg, file_path=str(file_path), stage="audio_extraction") from e
 
-    async def _run_ffmpeg_with_progress(self, cmd: list[str], progress_callback: Callable):
+    async def _run_ffmpeg_with_progress(self, cmd: list[str], progress_callback: Callable) -> None:
         """Run ffmpeg command with progress monitoring."""
         process = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
@@ -298,7 +303,8 @@ class AudioProcessor:
             stdout, stderr = await result.communicate()
 
             if result.returncode != 0:
-                raise ProcessingError("Failed to analyze audio properties")
+                msg = "Failed to analyze audio properties"
+                raise ProcessingError(msg)
 
             data = json.loads(stdout.decode())
 
@@ -389,7 +395,7 @@ class AudioProcessor:
         logger.info(f"Created {len(chunk_paths)} audio chunks")
         return chunk_paths
 
-    async def _cleanup_temp_files(self, directory: Path):
+    async def _cleanup_temp_files(self, directory: Path) -> None:
         """Cleanup temporary files to free memory."""
         logger.debug(f"Cleaning up temporary files in {directory}")
 
@@ -399,7 +405,7 @@ class AudioProcessor:
             except Exception as e:
                 logger.debug(f"Could not remove temp file {temp_file}: {e}")
 
-    async def _cleanup_directory(self, directory: Path):
+    async def _cleanup_directory(self, directory: Path) -> None:
         """Clean up entire working directory."""
         try:
             if directory.exists():
@@ -408,7 +414,7 @@ class AudioProcessor:
         except Exception as e:
             logger.warning(f"Failed to cleanup directory {directory}: {e}")
 
-    def cleanup_all(self):
+    def cleanup_all(self) -> None:
         """Clean up all temporary directories created by this processor."""
         logger.debug(f"Cleaning up {len(self.temp_directories)} temporary directories")
 

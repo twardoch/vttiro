@@ -275,7 +275,8 @@ def get_factory(name: str) -> factory.Factory:
         KeyError: If factory name is not found
     """
     if name not in FACTORIES:
-        raise KeyError(f"Unknown factory: {name}. Available: {list(FACTORIES.keys())}")
+        msg = f"Unknown factory: {name}. Available: {list(FACTORIES.keys())}"
+        raise KeyError(msg)
     return FACTORIES[name]
 
 

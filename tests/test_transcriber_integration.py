@@ -36,8 +36,7 @@ class TestTranscriberIntegration:
     def transcriber(self, mock_config):
         """Create Transcriber instance with mocked dependencies."""
         with patch("vttiro.core.transcriber.VideoProcessor"), patch("vttiro.core.transcriber.TranscriptionEnsemble"):
-            transcriber = Transcriber(mock_config)
-            return transcriber
+            return Transcriber(mock_config)
 
     def test_transcriber_initialization_with_error_handling(self, mock_config):
         """Test transcriber initialization includes error handling components."""
@@ -85,7 +84,7 @@ class TestTranscriberIntegration:
         transcriber.processing_resilience.execute = AsyncMock(return_value=mock_video_result)
 
         with patch("pathlib.Path.write_text"), patch("uuid.uuid4", return_value=MagicMock()):
-            result = await transcriber.transcribe("test_source.mp4")
+            await transcriber.transcribe("test_source.mp4")
 
             # Verify correlation ID was used
             assert transcriber.processing_resilience.execute.called
@@ -131,7 +130,8 @@ class TestTranscriberIntegration:
         # Mock transcribe method to fail on second source
         async def mock_transcribe(source, output_file, **kwargs):
             if "source2" in str(source):
-                raise TranscriptionError("Transcription failed")
+                msg = "Transcription failed"
+                raise TranscriptionError(msg)
             return str(output_file)
 
         transcriber.transcribe = AsyncMock(side_effect=mock_transcribe)

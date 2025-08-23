@@ -11,9 +11,11 @@ def validate_file_path(file_path: str | Path) -> Path:
     path = Path(file_path)
 
     if not path.exists():
-        raise ValidationError(f"File does not exist: {file_path}")
+        msg = f"File does not exist: {file_path}"
+        raise ValidationError(msg)
 
     if not path.is_file():
-        raise ValidationError(f"Path is not a file: {file_path}")
+        msg = f"Path is not a file: {file_path}"
+        raise ValidationError(msg)
 
     return path

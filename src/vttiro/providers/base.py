@@ -163,4 +163,5 @@ class TranscriberABC(ABC):
         try:
             validate_file_path(audio_path)
         except Exception as e:
-            raise ValueError(f"File validation failed for: {audio_path}: {e}")
+            msg = f"File validation failed for: {audio_path}: {e}"
+            raise ValueError(msg) from e

@@ -19,14 +19,7 @@ from typing import Any
 
 from loguru import logger
 
-from vttiro.core.errors import APIError, AuthenticationError, ProcessingError, handle_provider_exception
-from vttiro.core.types import TranscriptionResult, TranscriptSegment
-from vttiro.utils.api_keys import get_api_key_with_fallbacks
-from vttiro.utils.prompt import build_webvtt_prompt, optimize_prompt_for_provider
-from vttiro.utils.timestamp import distribute_words_over_duration
-
-# Removed complex type validation
-from vttiro.providers.base import TranscriberABC
+from vttiro.core.errors import APIError
 
 # Optional dependency handling
 try:

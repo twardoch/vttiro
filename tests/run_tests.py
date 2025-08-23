@@ -34,9 +34,8 @@ class TestRunner:
             Exit code from the command
         """
         if description:
-            print(f"\n=== {description} ===")
+            pass
 
-        print(f"Running: {' '.join(cmd)}")
         result = subprocess.run(cmd, check=False, cwd=self.root_dir)
         return result.returncode
 
@@ -372,7 +371,6 @@ def main():
         exit_code = test_methods[args.test_type]()
         sys.exit(exit_code)
     else:
-        print(f"Unknown test type: {args.test_type}")
         sys.exit(1)
 
 

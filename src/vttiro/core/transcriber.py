@@ -21,10 +21,11 @@ from typing import Any, Optional
 
 from loguru import logger
 
-from vttiro.utils.logging import log_milestone, log_performance, log_timing
 from vttiro.core.config import VttiroConfig
+from vttiro.core.constants import MAX_TIMEOUT_SECONDS, MIN_TIMEOUT_SECONDS
 from vttiro.core.errors import APIError, TranscriptionError, VttiroError
 from vttiro.core.types import TranscriptionResult, TranscriptSegment
+from vttiro.utils.logging import log_milestone, log_performance, log_timing
 
 
 class Transcriber:
@@ -67,7 +68,8 @@ class Transcriber:
 
         # Basic validation
         if not media_path.exists():
-            raise FileNotFoundError(f"Media file not found: {media_path}")
+            msg = f"Media file not found: {media_path}"
+            raise FileNotFoundError(msg)
 
         provider = self.config.engine or self.config.provider or "gemini"
         logger.info(f"Transcribing {media_path} using {provider}")
@@ -167,7 +169,7 @@ class Transcriber:
                 attempts=1,
                 details={"media_path": str(media_path), "provider": provider, "error": str(e)},
             )
-            raise error
+            raise error from e
 
         finally:
             # Cleanup working directory unless debug mode
@@ -248,7 +250,8 @@ class Transcriber:
 
             provider_instance = DeepgramTranscriber(self.config)
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            msg = f"Unsupported provider: {provider}"
+            raise ValueError(msg)
 
         # Call the provider's transcribe method
         return await provider_instance.transcribe(audio_path, **kwargs)
@@ -288,9 +291,9 @@ class Transcriber:
             issues.append(f"Unsupported provider: {provider}")
 
         # Check timeout
-        if self.config.timeout_seconds < 10:
+        if self.config.timeout_seconds < MIN_TIMEOUT_SECONDS:
             warnings.append("Very short timeout may cause failures")
-        elif self.config.timeout_seconds > 1800:
+        elif self.config.timeout_seconds > MAX_TIMEOUT_SECONDS:
             warnings.append("Very long timeout - consider reducing")
 
         return {"valid": len(issues) == 0, "issues": issues, "warnings": warnings, "config": self.config.to_dict()}

@@ -6,7 +6,7 @@ import asyncio
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -263,7 +263,8 @@ class MockAPIResponse:
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            raise Exception(f"HTTP {self.status_code}")
+            msg = f"HTTP {self.status_code}"
+            raise Exception(msg)
 
 
 @pytest.fixture

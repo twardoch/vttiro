@@ -39,13 +39,17 @@ class TranscriptSegment:
     def __post_init__(self) -> None:
         """Validate segment timing and content."""
         if self.start < 0:
-            raise ValueError(f"Start time cannot be negative: {self.start}")
+            msg = f"Start time cannot be negative: {self.start}"
+            raise ValueError(msg)
         if self.end < self.start:
-            raise ValueError(f"End time {self.end} cannot be before start time {self.start}")
+            msg = f"End time {self.end} cannot be before start time {self.start}"
+            raise ValueError(msg)
         if not self.text.strip():
-            raise ValueError("Segment text cannot be empty")
+            msg = "Segment text cannot be empty"
+            raise ValueError(msg)
         if self.confidence is not None and not (0.0 <= self.confidence <= 1.0):
-            raise ValueError(f"Confidence score must be between 0.0 and 1.0: {self.confidence}")
+            msg = f"Confidence score must be between 0.0 and 1.0: {self.confidence}"
+            raise ValueError(msg)
 
 
 @dataclass
@@ -82,15 +86,20 @@ class TranscriptionResult:
     def __post_init__(self) -> None:
         """Validate transcription result."""
         if not isinstance(self.segments, list):
-            raise TypeError("Segments must be a list")
+            msg = "Segments must be a list"
+            raise TypeError(msg)
         if not isinstance(self.metadata, dict):
-            raise TypeError("Metadata must be a dictionary")
+            msg = "Metadata must be a dictionary"
+            raise TypeError(msg)
         if not self.provider:
-            raise ValueError("Provider name cannot be empty")
+            msg = "Provider name cannot be empty"
+            raise ValueError(msg)
         if self.confidence is not None and not (0.0 <= self.confidence <= 1.0):
-            raise ValueError(f"Overall confidence must be between 0.0 and 1.0: {self.confidence}")
+            msg = f"Overall confidence must be between 0.0 and 1.0: {self.confidence}"
+            raise ValueError(msg)
 
         # Validate segment ordering
         for i, segment in enumerate(self.segments):
             if i > 0 and segment.start < self.segments[i - 1].end:
-                raise ValueError(f"Segment {i} overlaps with previous segment")
+                msg = f"Segment {i} overlaps with previous segment"
+                raise ValueError(msg)
